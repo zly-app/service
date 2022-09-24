@@ -44,20 +44,46 @@ func main() {
 
 # 配置
 
-> 默认服务类型为 `api`
+下面所有配置字段都是可选的, 默认服务类型为`api`.
 
-```toml
-[services.api]
-# bind地址
-Bind = ":8080"
-# 适配nginx的Forwarded获取ip, 优先级高于nginx的Real
-IPWithNginxForwarded = true
-# 适配nginx的Real获取ip, 优先级高于sock连接的ip
-IPWithNginxReal = true
-# 在开发环境中输出api结果
-LogApiResultInDevelop = true
-# 在生产环境发送详细的错误到客户端
-SendDetailedErrorInProduction = false
+```yml
+services:
+  api:
+    # bind地址
+    Bind: ':8080'
+    # 适配nginx的Forwarded获取ip, 优先级高于nginx的Real
+    IPWithNginxForwarded: true
+    # 适配nginx的Real获取ip, 优先级高于sock连接的ip
+    IPWithNginxReal: true
+    # post允许客户端传输最大数据大小, 单位字节, 默认32M
+    PostMaxMemory: 33554432
+    # 同时处理请求的goroutine数, 设为0时取逻辑cpu数*2, 设为负数时不作任何限制, 每个请求由独立的线程执行
+    ThreadCount: 0
+    # 最大请求等待队列大小
+    # 
+    # 只有 ThreadCount >= 0 时生效.
+    # 启动时创建一个指定大小的任务队列, 触发产生的请求会放入这个队列, 队列已满时新触发的请求会返回错误
+    MaxReqWaitQueueSize: 10000
+    # 请求日志等级设为info
+    ReqLogLevelIsInfo: true
+    # 响应日志等级设为info
+    RspLogLevelIsInfo: true
+    # bind日志等级设为info
+    BindLogLevelIsInfo: true
+    # 在开发环境中输出api结果
+    LogApiResultInDevelop: true
+    # 在生产环境中输出api结果
+    LogApiResultInProd: true
+    # 在生产环境发送详细的错误到客户端
+    SendDetailedErrorInProduction: false
+    # 总是输出headers日志, 如果设为false, 只会在出现错误时才会输出headers日志
+    AlwaysLogHeaders: true
+    # 总是输出body日志, 如果设为false, 只会在出现错误时才会输出body日志
+    AlwaysLogBody: true
+    # 日志输出结果最大大小，默认64k
+    LogApiResultMaxSize: 65536
+    # 日志输出body最大大小，默认64k
+    LogBodyMaxSize: 65536
 ```
 
 # 校验器
