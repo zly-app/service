@@ -134,14 +134,12 @@ func loggerMiddleware(app core.IApp, conf *config.Config) iris.Handler {
 
 		// body
 		if hasErr || conf.AlwaysLogBody {
-			var bodyText string
+			body, _ := irisCtx.GetBody()
+			bodyText := string(body)
 			if irisCtx.GetContentTypeRequested() == iris_context.ContentBinaryHeaderValue { // 流
-				bodyText = fmt.Sprintf("body<bytesLen=%d>", irisCtx.GetContentLength())
-			} else if irisCtx.GetContentLength() > conf.LogBodyMaxSize { // 超长
-				bodyText = fmt.Sprintf("body<len=%d>", irisCtx.GetContentLength())
-			} else {
-				body, _ := irisCtx.GetBody()
-				bodyText = string(body)
+				bodyText = fmt.Sprintf("<bytesLen=%d>", irisCtx.GetContentLength())
+			} else if len(bodyText) > int(conf.LogBodyMaxSize) { // 超长
+				bodyText = fmt.Sprintf("<len=%d>{%s...}", irisCtx.GetContentLength(), bodyText[:conf.LogBodyMaxSize])
 			}
 			span.LogFields(open_log.String("body", bodyText))
 			msgBuff.WriteString("body:")
@@ -293,14 +291,12 @@ func loggerMiddlewareWithJson(app core.IApp, conf *config.Config) iris.Handler {
 
 		// body
 		if hasErr || conf.AlwaysLogBody {
-			var bodyText string
+			body, _ := irisCtx.GetBody()
+			bodyText := string(body)
 			if irisCtx.GetContentTypeRequested() == iris_context.ContentBinaryHeaderValue { // 流
-				bodyText = fmt.Sprintf("body<bytesLen=%d>", irisCtx.GetContentLength())
-			} else if irisCtx.GetContentLength() > conf.LogBodyMaxSize { // 超长
-				bodyText = fmt.Sprintf("body<len=%d>", irisCtx.GetContentLength())
-			} else {
-				body, _ := irisCtx.GetBody()
-				bodyText = string(body)
+				bodyText = fmt.Sprintf("<bytesLen=%d>", irisCtx.GetContentLength())
+			} else if len(bodyText) > int(conf.LogBodyMaxSize) { // 超长
+				bodyText = fmt.Sprintf("<len=%d>{%s...}", irisCtx.GetContentLength(), bodyText[:conf.LogBodyMaxSize])
 			}
 			span.LogFields(open_log.String("body", bodyText))
 			fields = append(fields, zap.String("body", bodyText))
