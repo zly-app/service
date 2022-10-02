@@ -19,8 +19,8 @@ const (
 	defaultIPWithNginxReal = true
 	// 在开发环境中输出api结果
 	defLogApiResultInDevelop = true
-	// 默认post允许最大数据大小(32M)
-	defaultPostMaxMemory = 32 << 20
+	// 默认post允许最大数据大小(128M)
+	defaultPostMaxMemory = 128 << 20
 
 	// 同时处理请求的goroutine数
 	defThreadCount = 0
@@ -43,10 +43,10 @@ const (
 	defAlwaysLogHeaders = true
 	// 总是输出body日志
 	defAlwaysLogBody = true
-	// 默认输出结果最大大小
-	defaultLogApiResultMaxSize = 64 << 10
-	// 输出body最大大小
-	defaultLogBodyMaxSize = 64 << 10
+	// 默认输出结果最大大小(128K)
+	defaultLogApiResultMaxSize = 128 << 10
+	// 输出body最大大小(128K)
+	defaultLogBodyMaxSize = 128 << 10
 )
 
 // api服务配置
@@ -73,7 +73,7 @@ type Config struct {
 	AlwaysLogHeaders              bool  // 总是输出headers日志, 如果设为false, 只会在出现错误时才会输出headers日志
 	AlwaysLogBody                 bool  // 总是输出body日志, 如果设为false, 只会在出现错误时才会输出body日志
 	LogApiResultMaxSize           int   // 日志输出结果最大大小
-	LogBodyMaxSize                int64 // 日志输出body最大大小
+	LogBodyMaxSize                int64 // 日志输出请求body最大大小
 }
 
 func NewConfig() *Config {
