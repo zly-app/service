@@ -134,12 +134,15 @@ func loggerMiddleware(app core.IApp, conf *config.Config) iris.Handler {
 
 		// body
 		if hasErr || conf.AlwaysLogBody {
-			body, _ := irisCtx.GetBody()
-			bodyText := string(body)
+			var bodyText string
 			if irisCtx.GetContentTypeRequested() == iris_context.ContentBinaryHeaderValue { // 流
 				bodyText = fmt.Sprintf("<bytesLen=%d>", irisCtx.GetContentLength())
-			} else if len(bodyText) > int(conf.LogBodyMaxSize) { // 超长
-				bodyText = fmt.Sprintf("<len=%d>{%s...}", irisCtx.GetContentLength(), bodyText[:conf.LogBodyMaxSize])
+			} else {
+				body, _ := irisCtx.GetBody()
+				bodyText = string(body)
+				if len(bodyText) > int(conf.LogBodyMaxSize) { // 超长
+					bodyText = fmt.Sprintf("<len=%d>{%s...}", irisCtx.GetContentLength(), bodyText[:conf.LogBodyMaxSize])
+				}
 			}
 			span.LogFields(open_log.String("body", bodyText))
 			msgBuff.WriteString("body:")
@@ -152,17 +155,20 @@ func loggerMiddleware(app core.IApp, conf *config.Config) iris.Handler {
 			var result string
 			contentType := iris_context.TrimHeaderValue(irisCtx.ResponseWriter().Header().Get(iris_context.ContentTypeHeaderKey))
 			if contentType == iris_context.ContentBinaryHeaderValue { // 流
-				result = fmt.Sprintf("result<bytesLen=%d>", irisCtx.ResponseWriter().Written())
-			} else if irisCtx.ResponseWriter().Written() > conf.LogApiResultMaxSize { // 超长
-				result = fmt.Sprintf("result<len=%d>", irisCtx.ResponseWriter().Written())
+				result = fmt.Sprintf("<bytesLen=%d>", irisCtx.ResponseWriter().Written())
 			} else {
 				switch v := irisCtx.Values().Get("result").(type) {
 				case nil:
-					result = "result<nil>"
+					result = "<nil>"
 				case string:
 					result = v
+				case []byte:
+					result = string(v)
 				default:
 					result, _ = jsoniter.ConfigCompatibleWithStandardLibrary.MarshalToString(v)
+				}
+				if irisCtx.ResponseWriter().Written() > conf.LogApiResultMaxSize { // 超长
+					result = fmt.Sprintf("<len=%d>{%s...}", irisCtx.ResponseWriter().Written(), result[:conf.LogApiResultMaxSize])
 				}
 			}
 			span.LogFields(open_log.String("result", result))
@@ -291,12 +297,15 @@ func loggerMiddlewareWithJson(app core.IApp, conf *config.Config) iris.Handler {
 
 		// body
 		if hasErr || conf.AlwaysLogBody {
-			body, _ := irisCtx.GetBody()
-			bodyText := string(body)
+			var bodyText string
 			if irisCtx.GetContentTypeRequested() == iris_context.ContentBinaryHeaderValue { // 流
 				bodyText = fmt.Sprintf("<bytesLen=%d>", irisCtx.GetContentLength())
-			} else if len(bodyText) > int(conf.LogBodyMaxSize) { // 超长
-				bodyText = fmt.Sprintf("<len=%d>{%s...}", irisCtx.GetContentLength(), bodyText[:conf.LogBodyMaxSize])
+			} else {
+				body, _ := irisCtx.GetBody()
+				bodyText = string(body)
+				if len(bodyText) > int(conf.LogBodyMaxSize) { // 超长
+					bodyText = fmt.Sprintf("<len=%d>{%s...}", irisCtx.GetContentLength(), bodyText[:conf.LogBodyMaxSize])
+				}
 			}
 			span.LogFields(open_log.String("body", bodyText))
 			fields = append(fields, zap.String("body", bodyText))
@@ -307,17 +316,20 @@ func loggerMiddlewareWithJson(app core.IApp, conf *config.Config) iris.Handler {
 			var result string
 			contentType := iris_context.TrimHeaderValue(irisCtx.ResponseWriter().Header().Get(iris_context.ContentTypeHeaderKey))
 			if contentType == iris_context.ContentBinaryHeaderValue { // 流
-				result = fmt.Sprintf("result<bytesLen=%d>", irisCtx.ResponseWriter().Written())
-			} else if irisCtx.ResponseWriter().Written() > conf.LogApiResultMaxSize { // 超长
-				result = fmt.Sprintf("result<len=%d>", irisCtx.ResponseWriter().Written())
+				result = fmt.Sprintf("<bytesLen=%d>", irisCtx.ResponseWriter().Written())
 			} else {
 				switch v := irisCtx.Values().Get("result").(type) {
 				case nil:
-					result = "result<nil>"
+					result = "<nil>"
 				case string:
 					result = v
+				case []byte:
+					result = string(v)
 				default:
 					result, _ = jsoniter.ConfigCompatibleWithStandardLibrary.MarshalToString(v)
+				}
+				if irisCtx.ResponseWriter().Written() > conf.LogApiResultMaxSize { // 超长
+					result = fmt.Sprintf("<len=%d>{%s...}", irisCtx.ResponseWriter().Written(), result[:conf.LogApiResultMaxSize])
 				}
 			}
 			span.LogFields(open_log.String("result", result))
