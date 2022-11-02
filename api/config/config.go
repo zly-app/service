@@ -21,8 +21,6 @@ const (
 	defaultIPWithProxyForwarded = true
 	// 适配proxy的X-Real-Ip获取ip, 优先级高于sock连接的ip
 	defaultIPWithProxyReal = true
-	// 在开发环境中输出api结果
-	defLogApiResultInDevelop = true
 	// 默认post允许最大数据大小(128M)
 	defaultPostMaxMemory = 128 << 20
 
@@ -37,7 +35,9 @@ const (
 	defRspLogLevelIsInfo = true
 	// bind日志等级设为info
 	defBindLogLevelIsInfo = true
-	// 在生产环境中输出api结果
+	// 在开发环境中输出api结果日志
+	defLogApiResultInDevelop = true
+	// 在生产环境中输出api结果日志
 	defLogApiResultInProd = true
 	// 在生产环境发送详细的错误到客户端
 	defSendDetailedErrorInProduction = false
@@ -45,10 +45,10 @@ const (
 	defAlwaysLogHeaders = true
 	// 总是输出body日志
 	defAlwaysLogBody = true
-	// 默认输出结果最大大小(128K)
-	defaultLogApiResultMaxSize = 128 << 10
-	// 输出body最大大小(128K)
-	defaultLogBodyMaxSize = 128 << 10
+	// 默认输出结果最大大小(256K)
+	defaultLogApiResultMaxSize = 256 << 10
+	// 输出body最大大小(256K)
+	defaultLogBodyMaxSize = 256 << 10
 )
 
 // api服务配置
@@ -70,8 +70,8 @@ type Config struct {
 	ReqLogLevelIsInfo             bool  // 请求日志等级设为info
 	RspLogLevelIsInfo             bool  // 响应日志等级设为info
 	BindLogLevelIsInfo            bool  // bind日志等级设为info
-	LogApiResultInDevelop         bool  // 在开发环境中输出api结果
-	LogApiResultInProd            bool  // 在生产环境中输出api结果
+	LogApiResultInDevelop         bool  // 在开发环境中输出api结果日志
+	LogApiResultInProd            bool  // 在生产环境中输出api结果日志
 	SendDetailedErrorInProduction bool  // 在生产环境发送详细的错误到客户端
 	AlwaysLogHeaders              bool  // 总是输出headers日志, 如果设为false, 只会在出现错误时才会输出headers日志
 	AlwaysLogBody                 bool  // 总是输出body日志, 如果设为false, 只会在出现错误时才会输出body日志

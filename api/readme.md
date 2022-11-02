@@ -57,8 +57,8 @@ services:
     IPWithNginxForwarded: true
     # 适配proxy的X-Real-Ip获取ip, 优先级高于sock连接的ip
     IPWithNginxReal: true
-    # post允许客户端传输最大数据大小, 单位字节, 默认32M
-    PostMaxMemory: 33554432
+    # post允许客户端传输最大数据大小, 单位字节, 默认128M
+    PostMaxMemory: 134217728
     # 同时处理请求的goroutine数, 设为0时取逻辑cpu数*2, 设为负数时不作任何限制, 每个请求由独立的线程执行
     ThreadCount: 0
     # 最大请求等待队列大小
@@ -72,9 +72,9 @@ services:
     RspLogLevelIsInfo: true
     # bind日志等级设为info
     BindLogLevelIsInfo: true
-    # 在开发环境中输出api结果
+    # 在开发环境中输出api结果日志
     LogApiResultInDevelop: true
-    # 在生产环境中输出api结果
+    # 在生产环境中输出api结果日志
     LogApiResultInProd: true
     # 在生产环境发送详细的错误到客户端
     SendDetailedErrorInProduction: false
@@ -82,10 +82,10 @@ services:
     AlwaysLogHeaders: true
     # 总是输出body日志, 如果设为false, 只会在出现错误时才会输出body日志
     AlwaysLogBody: true
-    # 日志输出结果最大大小，默认64k
-    LogApiResultMaxSize: 65536
-    # 日志输出body最大大小，默认64k
-    LogBodyMaxSize: 65536
+    # 日志输出结果最大大小，默认256k
+    LogApiResultMaxSize: 262144
+    # 日志输出body最大大小，默认256k
+    LogBodyMaxSize: 262144
 ```
 
 # 校验器
