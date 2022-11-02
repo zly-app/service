@@ -104,10 +104,13 @@ func (a *ApiService) Start() error {
 		iris.WithFireMethodNotAllowed,                // 路由未找到时返回405而不是404
 		iris.WithPostMaxMemory(a.conf.PostMaxMemory), // post允许客户端传输最大数据大小
 	}
-	if a.conf.IPWithNginxForwarded {
+	if a.conf.IPWithIngressForwarded {
+		opts = append(opts, iris.WithRemoteAddrHeader("X-Original-Forwarded-For"))
+	}
+	if a.conf.IPWithProxyForwarded {
 		opts = append(opts, iris.WithRemoteAddrHeader("X-Forwarded-For"))
 	}
-	if a.conf.IPWithNginxReal {
+	if a.conf.IPWithProxyReal {
 		opts = append(opts, iris.WithRemoteAddrHeader("X-Real-IP"))
 	}
 	return a.Run(iris.Addr(a.conf.Bind), opts...)

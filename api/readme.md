@@ -51,9 +51,11 @@ services:
   api:
     # bind地址
     Bind: ':8080'
-    # 适配nginx的Forwarded获取ip, 优先级高于nginx的Real
+    # 适配ingress的X-Original-Forwarded-For获取ip, 优先级高于X-Forwarded-For
+    IPWithIngressForwarded: true
+    # 适配proxy的X-Forwarded-For获取ip, 优先级高于X-Real-Ip
     IPWithNginxForwarded: true
-    # 适配nginx的Real获取ip, 优先级高于sock连接的ip
+    # 适配proxy的X-Real-Ip获取ip, 优先级高于sock连接的ip
     IPWithNginxReal: true
     # post允许客户端传输最大数据大小, 单位字节, 默认32M
     PostMaxMemory: 33554432
