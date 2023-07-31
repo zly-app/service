@@ -229,6 +229,6 @@ func main() {
 }
 ```
 
-1. handler启动时从pos文件中获取位置, 如果文件不存在则返回默认位置. 默认位置可通过`PosFileWithMaxSize`修改.
+1. handler启动时从pos文件中获取位置, 如果文件不存在则返回默认位置. 默认位置可通过`PosFileWithDefaultPos`修改.
 2. pos变更时自动将pos追加到pos文件末尾, 如果是`force`则立即刷新到磁盘.
 3. pos追加时会检查当前写入文件大小. 如果追加后会超过设置的`最大文件大小`则会创建一个新的pos文件写入pos并立即刷新到磁盘, 接着调用`Rename`命令替换之前的pos文件.
