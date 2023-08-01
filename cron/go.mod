@@ -4,6 +4,6 @@ go 1.15
 
 require (
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/zly-app/zapp v1.1.11
+	github.com/zly-app/zapp v1.3.3
 	go.uber.org/zap v1.16.0
 )

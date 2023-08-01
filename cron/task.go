@@ -1,9 +1,13 @@
 package cron
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/zly-app/zapp/pkg/utils"
+	"go.uber.org/zap"
 )
 
 type ITask interface {
@@ -13,13 +17,15 @@ type ITask interface {
 	Handler() Handler
 	// 返回启用状态
 	IsEnable() bool
+	// 执行超时时间
+	Timeout() time.Duration
 
 	// 获取触发时间
 	TriggerTime() time.Time
 	// 生成下次触发时间, 如果返回了 false 表示没有下一次了, 返回的时间一定>t
 	MakeNextTriggerTime(t time.Time) (time.Time, bool)
 	// 立即触发执行, 阻塞等待执行结束
-	Trigger(ctx IContext, callback ErrCallback) error
+	Trigger(ctx context.Context) error
 
 	// 重置定时, 发生在被定时器添加任务时和重新设为启用时
 	resetClock()
@@ -39,6 +45,7 @@ type Task struct {
 	triggerTime time.Time
 	trigger     ITrigger
 	executor    IExecutor
+	timeout     time.Duration // 执行超时时间
 
 	enable int32
 	mx     sync.Mutex // 用于锁 triggerTime, trigger, executor
@@ -50,6 +57,7 @@ type TaskConfig struct {
 	Trigger  ITrigger
 	Executor IExecutor
 	Handler  Handler
+	TimeOut  time.Duration
 	Enable   bool
 }
 
@@ -72,6 +80,7 @@ func NewTaskOfConfig(name string, config TaskConfig) ITask {
 		trigger:  config.Trigger,
 		executor: config.Executor,
 		handler:  config.Handler,
+		timeout:  config.TimeOut,
 	}
 	t.setEnable(config.Enable)
 	return t
@@ -85,6 +94,9 @@ func (t *Task) Handler() Handler {
 }
 func (t *Task) IsEnable() bool {
 	return atomic.LoadInt32(&t.enable) == 1
+}
+func (t *Task) Timeout() time.Duration {
+	return t.timeout
 }
 func (t *Task) TriggerTime() time.Time {
 	t.mx.Lock()
@@ -103,16 +115,32 @@ func (t *Task) MakeNextTriggerTime(tt time.Time) (time.Time, bool) {
 	t.mx.Unlock()
 	return tt, ok
 }
-func (t *Task) Trigger(ctx IContext, callback ErrCallback) error {
-	return t.execute(ctx, callback)
+func (t *Task) Trigger(ctx context.Context) error {
+	return t.execute(ctx)
 }
 
 // 执行
-func (t *Task) execute(ctx IContext, errCallback ErrCallback) error {
+func (t *Task) execute(ctx context.Context) error {
 	t.mx.Lock()
 	executor := t.executor
 	t.mx.Unlock()
-	return executor.Do(ctx, errCallback)
+	onDo := func(retryNums int) (IContext, error) {
+		doCtx, span := utils.Otel.StartSpan(ctx, t.Name()+" do", utils.OtelSpanKey("retryNums").Int(retryNums))
+		defer utils.Otel.EndSpan(span)
+
+		if t.timeout > 0 {
+			timeoutCtx, cancel := context.WithTimeout(doCtx, t.timeout)
+			defer cancel()
+			doCtx = timeoutCtx
+		}
+
+		iCtx := newContext(doCtx, t)
+		return iCtx, t.handler(iCtx)
+	}
+	return executor.Do(onDo, t.errCallback)
+}
+func (t *Task) errCallback(ctx IContext, err error) {
+	ctx.Warn(ctx, "cron.error! try retry", zap.String("err", utils.Recover.GetRecoverErrorDetail(err)))
 }
 
 func (t *Task) resetClock() {

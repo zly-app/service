@@ -9,6 +9,7 @@
 package cron
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -396,16 +397,15 @@ func (c *CronService) execute(task ITask) {
 		return
 	}
 
-	ctx := newContext(c.app, task)
-	ctx.Debug("cron.start")
+	baseCtx, span := utils.Otel.StartSpan(context.Background(), task.Name()+" trigger")
+	defer utils.Otel.EndSpan(span)
 
-	err := task.Trigger(ctx, func(ctx IContext, err error) {
-		ctx.Warn("cron.error! try retry", zap.String("err", utils.Recover.GetRecoverErrorDetail(err)))
-	})
+	c.app.Debug(baseCtx, "cron.start")
+	err := task.Trigger(baseCtx)
 	if err != nil {
-		ctx.Error("cron.error!\n" + utils.Recover.GetRecoverErrorDetail(err))
+		c.app.Error(baseCtx, "cron.error!\n"+utils.Recover.GetRecoverErrorDetail(err))
 	} else {
-		ctx.Debug("cron.success")
+		c.app.Debug(baseCtx, "cron.success")
 	}
 }
 
