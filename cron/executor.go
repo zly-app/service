@@ -24,7 +24,7 @@ type IExecutor interface {
 }
 
 type Executor struct {
-	maxConcurrentExecuteCount int64         // 最大并发执行数
+	maxConcurrentExecuteCount int64         // 最大并发执行数, -1表示不限制
 	concurrentExecuteCount    int64         // 当前并发执行数
 	maxRetryCount             int64         // 重试次数
 	retryInterval             time.Duration // 重试间隔
@@ -35,8 +35,11 @@ type Executor struct {
 //
 // retryCount: 任务失败重试次数
 // retryInterval: 失败重试间隔时间
-// maxConcurrentExecuteCount: 最大并发执行任务数, 如果为0则不限制
+// maxConcurrentExecuteCount: 最大并发执行任务数, 如果为-1则不限制, 默认为1
 func NewExecutor(retryCount int64, retryInterval time.Duration, maxConcurrentExecuteCount int64) IExecutor {
+	if maxConcurrentExecuteCount == 0 {
+		maxConcurrentExecuteCount = 1
+	}
 	return &Executor{
 		maxConcurrentExecuteCount: maxConcurrentExecuteCount,
 		concurrentExecuteCount:    0,
@@ -47,16 +50,18 @@ func NewExecutor(retryCount int64, retryInterval time.Duration, maxConcurrentExe
 
 // 执行, 如果已经达到最大并发执行任务数则会返回错误
 func (w *Executor) Do(onDo func(retryNums int) (IContext, error), errCallback ErrCallback) error {
-	if w.maxConcurrentExecuteCount > 0 && atomic.LoadInt64(&w.concurrentExecuteCount) >= w.maxConcurrentExecuteCount {
+	if w.maxConcurrentExecuteCount > 0 && atomic.AddInt64(&w.concurrentExecuteCount, 1) > w.maxConcurrentExecuteCount {
+		atomic.AddInt64(&w.concurrentExecuteCount, -1) // 增加了要退回去
 		return OutOfMaxConcurrentExecuteCount
 	}
 
 	w.wg.Add(1)
-	atomic.AddInt64(&w.concurrentExecuteCount, 1)
 
 	err := w.doRetry(w.retryInterval, w.maxRetryCount, onDo, errCallback)
 
-	atomic.AddInt64(&w.concurrentExecuteCount, -1)
+	if w.maxConcurrentExecuteCount > 0 {
+		atomic.AddInt64(&w.concurrentExecuteCount, -1) // 执行完毕也要退回去
+	}
 	w.wg.Done()
 	return err
 }

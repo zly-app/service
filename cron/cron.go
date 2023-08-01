@@ -18,7 +18,9 @@ import (
 
 	"github.com/zly-app/zapp/component/gpool"
 	"github.com/zly-app/zapp/core"
+	"github.com/zly-app/zapp/logger"
 	"github.com/zly-app/zapp/pkg/utils"
+	"github.com/zlyuancn/zutils"
 	"go.uber.org/zap"
 )
 
@@ -94,8 +96,9 @@ const heapsCount = 64 // 任务堆数量
 type CronService struct {
 	app core.IApp
 
-	tasks map[string]ITask // 任务
-	heaps []ITaskHeap      // 任务堆列表, 根据触发时间取模将任务分配到不同的任务堆
+	tasks           map[string]ITask // 任务
+	taskFileConfigs map[string]*TaskFileConfig
+	heaps           []ITaskHeap // 任务堆列表, 根据触发时间取模将任务分配到不同的任务堆
 
 	runState  RunState
 	closeChan chan struct{}
@@ -108,7 +111,7 @@ type CronService struct {
 func NewCronService(app core.IApp) core.IService {
 	conf := newConfig()
 	vi := app.GetConfig().GetViper()
-	confKey := "servicec." + string(nowServiceType)
+	confKey := "services." + string(nowServiceType)
 	if vi.IsSet(confKey) {
 		if err := vi.UnmarshalKey(confKey, conf); err != nil {
 			app.Fatal(fmt.Errorf("无法解析<%s>服务配置: %s", nowServiceType, err))
@@ -128,6 +131,11 @@ func NewCronService(app core.IApp) core.IService {
 			JobQueueSize: conf.MaxTaskQueueSize,
 			ThreadCount:  conf.ThreadCount,
 		})
+	}
+
+	c.taskFileConfigs = make(map[string]*TaskFileConfig, len(conf.Tasks))
+	for _, t := range conf.Tasks {
+		c.taskFileConfigs[t.Name] = &t
 	}
 	return c
 }
@@ -209,6 +217,7 @@ func (c *CronService) Resume() {
 }
 
 func (c *CronService) AddTask(task ITask) bool {
+	task = c.rebuildTask(task)
 	c.mx.Lock()
 	if _, ok := c.tasks[task.Name()]; ok { // 已存在
 		c.mx.Unlock()
@@ -400,12 +409,14 @@ func (c *CronService) execute(task ITask) {
 	baseCtx, span := utils.Otel.StartSpan(context.Background(), task.Name()+" trigger")
 	defer utils.Otel.EndSpan(span)
 
-	c.app.Debug(baseCtx, "cron.start")
+	log := c.app.NewTraceLogger(baseCtx, zap.String("task_name", task.Name()))
+
+	log.Debug("cron.start")
 	err := task.Trigger(baseCtx)
 	if err != nil {
-		c.app.Error(baseCtx, "cron.error!\n"+utils.Recover.GetRecoverErrorDetail(err))
+		log.Error("cron.error!\n" + utils.Recover.GetRecoverErrorDetail(err))
 	} else {
-		c.app.Debug(baseCtx, "cron.success")
+		log.Debug("cron.success")
 	}
 }
 
@@ -430,4 +441,36 @@ func (c *CronService) resetClock() {
 		}
 	}
 	c.mx.Unlock()
+}
+
+// 根据配置文件重建task
+func (c *CronService) rebuildTask(task ITask) ITask {
+	conf, ok := c.taskFileConfigs[task.Name()]
+	if !ok {
+		return task
+	}
+
+	var trigger ITrigger
+	if conf.IsOnceTrigger {
+		t, err := zutils.Time.TextToTimeOfLayout(conf.Expression, zutils.Time.Layout)
+		if err != nil {
+			logger.Log.Fatal("解析一次性任务失败",
+				zap.String("task", task.Name()),
+				zap.String("expression", conf.Expression),
+				zap.Error(err),
+			)
+		}
+		trigger = NewOnceTrigger(t)
+	} else {
+		trigger = NewCronTrigger(conf.Expression)
+	}
+
+	executor := NewExecutor(conf.RetryCount, time.Duration(conf.RetrySleepMs)*time.Second, conf.MaxConcurrentExecuteCount)
+	return NewTaskOfConfig(task.Name(), TaskConfig{
+		Trigger:  trigger,
+		Executor: executor,
+		Handler:  task.Handler(),
+		TimeOut:  time.Duration(conf.TimeoutMs) * time.Second,
+		Enable:   !conf.Disable,
+	})
 }

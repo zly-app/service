@@ -69,6 +69,7 @@ func NewTask(name string, expression string, enable bool, handler Handler) ITask
 		Trigger:  trigger,
 		Executor: executor,
 		Handler:  handler,
+		TimeOut:  0,
 		Enable:   enable,
 	})
 }
