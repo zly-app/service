@@ -27,7 +27,7 @@ type TaskFileConfig struct {
 	Disable                   bool   // 是否禁用
 	RetryCount                int64  // 任务失败重试次数, 0表示不重试
 	RetrySleepMs              int64  // 失败重试等待时间, 单位秒, 0表示不等待
-	MaxConcurrentExecuteCount int64  // 最大并发执行任务数, 如果为0则不限制. 表示在执行过程中又被调度器触发执行时, 能同时运行同一个任务的数量. 默认1
+	MaxConcurrentExecuteCount int64  // 最大并发执行任务数, 如果为-1则不限制. 表示在执行过程中又被调度器触发执行时, 能同时运行同一个任务的数量. 默认1
 	TimeoutMs                 int64  // 超时时间, 单位秒, 0表示永不超时
 }
 
