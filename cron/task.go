@@ -125,10 +125,11 @@ func (t *Task) execute(ctx context.Context) error {
 	t.mx.Lock()
 	executor := t.executor
 	t.mx.Unlock()
-	onDo := func(retryNums int) (IContext, error) {
-		doCtx, span := utils.Otel.StartSpan(ctx, t.Name()+" do", utils.OtelSpanKey("retryNums").Int(retryNums))
-		defer utils.Otel.EndSpan(span)
 
+	doCtx, span := utils.Otel.StartSpan(ctx, string(DefaultServiceType)+"/"+t.Name())
+	defer utils.Otel.EndSpan(span)
+
+	onDo := func(retryNums int) (IContext, error) {
 		if t.timeout > 0 {
 			timeoutCtx, cancel := context.WithTimeout(doCtx, t.timeout)
 			defer cancel()
