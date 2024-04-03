@@ -41,10 +41,8 @@ func main() {
 ```yaml
 services:
   cron:
-    # 线程数, 默认为-1
-    ThreadCount = -1
-    # 最大任务队列大小, 默认为10000
-    MaxTaskQueueSize = 0
+    ThreadCount: -1 # 线程数, 默认为-1
+    MaxTaskQueueSizeP: 0 # 最大任务队列大小, 默认为10000
 ```
 
 # 通过配置修改task默认行为
@@ -52,14 +50,16 @@ services:
 ```yaml
 services:
   cron:
+    ThreadCount: -1 # 线程数, 默认为-1
+    MaxTaskQueueSizeP: 0 # 最大任务队列大小, 默认为10000
     # 任务列表
     tasks:
-      Name: '' # 任务名, 将会替换代码中相同任务名的默认行为
-      Expression: '' # cron表达式, https://en.wikipedia.org/wiki/Cron
-      IsOnceTrigger: false # 是否为一次性触发, 如果设为true, 则 Expression 的格式为 YYYY-MM-dd hh:mm:ss
-      Disable: false # 是否禁用
-      RetryCount: 0 # 任务失败重试次数, 0表示不重试
-      RetrySleepMs: 0 # 失败重试等待时间, 单位秒, 0表示不等待
-      MaxConcurrentExecuteCount: 1 # 最大并发执行任务数, 如果为-1则不限制. 表示在执行过程中又被调度器触发执行时, 能同时运行同一个任务的数量. 默认1
-      TimeoutMs: 0 # 超时时间, 单位秒, 0表示永不超时
+      - Name: '' # 任务名, 将会替换代码中相同任务名的默认行为
+        Expression: '' # cron表达式, https://en.wikipedia.org/wiki/Cron
+        IsOnceTrigger: false # 是否为一次性触发, 如果设为true, 则 Expression 的格式为 YYYY-MM-dd hh:mm:ss
+        Disable: false # 是否禁用
+        RetryCount: 0 # 任务失败重试次数, 0表示不重试
+        RetrySleepMs: 0 # 失败重试等待时间, 单位秒, 0表示不等待
+        MaxConcurrentExecuteCount: 1 # 最大并发执行任务数, 如果为-1则不限制. 表示在执行过程中又被调度器触发执行时, 能同时运行同一个任务的数量. 默认1
+        TimeoutMs: 0 # 超时时间, 单位秒, 0表示永不超时
 ```
