@@ -17,6 +17,7 @@ services:
     t1: # 注册名
       config:
         url: pulsar://localhost:6650
+        ListenerName: external # 监听器名称, 这里采用 external 以实现内外网分流. 参考 https://pulsar.apache.org/docs/3.2.x/concepts-multiple-advertised-listeners/
         topics: persistent://public/default/test # 消费topic, 多个topic用英文逗号连接
         subscriptionName: test # 订阅名
         subscriptionType: shared # 订阅类型, 支持 exclusive,failover,shared,keyshared. 默认 shared
