@@ -29,6 +29,8 @@ services:
 package main
 
 import (
+	"context"
+
 	pulsar_consume "github.com/zly-app/service/pulsar-consume"
 
 	"github.com/zly-app/zapp"
@@ -41,8 +43,8 @@ func main() {
 	defer app.Exit()
 
 	pulsar_consume.RegistryHandler("t1", // 注册handler, 这里的注册名要和配置文件中的一样
-		func(ctx *pulsar_consume.Context) error {
-			ctx.Info("Payload: ", string(ctx.Msg.Payload()))
+		func(ctx context.Context, msg pulsar_consume.Message) error {
+			app.Info(ctx, "Payload: ", string(msg.Payload()))
 			return nil
 		})
 

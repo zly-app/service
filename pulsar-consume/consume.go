@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
+type ConsumerHandler func(ctx context.Context, msg Message) error
+
 type Consumer struct {
 	app       core.IApp
 	conf      *Config

@@ -128,7 +128,7 @@ func NewServiceAdapter(app core.IApp) core.IService {
 			services[name] = nil
 			continue
 		}
-		s, err := NewConsumeService(app, &conf.Config)
+		s, err := NewConsumeService(name, app, &conf.Config)
 		if err != nil {
 			logger.Log.Panic("创建服务失败", zap.String("serviceType", string(nowServiceType)), zap.String("name", name), zap.Error(err))
 		}

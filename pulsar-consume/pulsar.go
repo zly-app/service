@@ -9,11 +9,12 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/zly-app/zapp/core"
+	"github.com/zly-app/zapp/filter"
 	"github.com/zly-app/zapp/pkg/utils"
-	"go.uber.org/zap"
 )
 
 type PulsarConsumeService struct {
+	name     string
 	app      core.IApp
 	client   pulsar.Client
 	conf     *Config
@@ -51,60 +52,56 @@ func (p *PulsarConsumeService) RegistryHandler(handler ...ConsumerHandler) {
 	p.handler = append(p.handler, h...)
 }
 
+type consumeReq struct {
+	MID             string
+	Topic           string
+	Payload         string
+	PublishTime     time.Time         `json:"PublishTime,omitempty"`
+	Key             string            `json:"Key,omitempty"`
+	OrderingKey     string            `json:"OrderingKey,omitempty"`
+	Properties      map[string]string `json:"Properties,omitempty"`
+	RedeliveryCount uint32            `json:"RedeliveryCount,omitempty"`
+	msg             Message
+}
+
 func (p *PulsarConsumeService) consumeHandler(msg Message) bool {
-	ctx, cancel := context.WithCancel(p.app.BaseContext())
-	defer cancel()
-
-	logger := p.app.NewTraceLogger(ctx,
-		zap.String("Topic", msg.Topic()),
-		zap.String("SubscriptionName", p.conf.SubscriptionName),
-		zap.String("SubscriptionType", p.conf.SubscriptionType),
-		zap.Int64("LedgerID", msg.ID().LedgerID()),
-		zap.Int64("EntryID", msg.ID().EntryID()),
-		zap.String("ProducerName", msg.ProducerName()),
-		zap.String("PublishTime", msg.PublishTime().Format(time.RFC3339Nano)),
-	)
-	cCtx := &Context{
-		ILogger:          logger,
-		Ctx:              ctx,
-		Msg:              msg,
-		SubscriptionName: p.conf.SubscriptionName,
+	ctx, chain := filter.GetServiceFilter(p.app.BaseContext(), string(DefaultServiceType)+"/"+p.name, "Consume")
+	r := &consumeReq{
+		MID:             msg.ID().String(),
+		Topic:           msg.Topic(),
+		Payload:         string(msg.Payload()),
+		PublishTime:     msg.PublishTime(),
+		Key:             msg.Key(),
+		OrderingKey:     msg.OrderingKey(),
+		Properties:      msg.Properties(),
+		RedeliveryCount: msg.RedeliveryCount(),
+		msg:             msg,
 	}
-
-	if p.conf.ConsumeLogLevelIsInfo {
-		cCtx.Info("pulsarConsume.receive")
-	} else {
-		cCtx.Debug("pulsarConsume.receive")
-	}
-
-	err := utils.Recover.WrapCall(func() error {
-		for _, fn := range p.handler {
-			if err := fn(cCtx); err != nil {
-				return err
+	_, err := chain.Handle(ctx, r, func(ctx context.Context, req interface{}) (interface{}, error) {
+		msg := req.(*consumeReq).msg
+		err := utils.Recover.WrapCall(func() error {
+			for _, fn := range p.handler {
+				if err := fn(ctx, msg); err != nil {
+					return err
+				}
 			}
-		}
-		return nil
+			return nil
+		})
+		return nil, err
 	})
 	if err != nil {
-		errDetail := utils.Recover.GetRecoverErrorDetail(err)
-		cCtx.Error("pulsarConsumer.error!", zap.String("error", errDetail))
 		return false
-	}
-
-	if p.conf.ConsumeLogLevelIsInfo {
-		cCtx.Info("pulsarConsumer.success")
-	} else {
-		cCtx.Debug("pulsarConsumer.success")
 	}
 	return true
 }
 
-func NewConsumeService(app core.IApp, conf *Config) (*PulsarConsumeService, error) {
+func NewConsumeService(name string, app core.IApp, conf *Config) (*PulsarConsumeService, error) {
 	if err := conf.Check(); err != nil {
 		return nil, fmt.Errorf("配置检查失败: %v", err)
 	}
 
 	p := &PulsarConsumeService{
+		name: name,
 		app:  app,
 		conf: conf,
 	}

@@ -71,7 +71,6 @@ type Config struct {
 	MaxReconnectToBroker           int    // 重新连接到broker的最大次数, -1表示不限
 	EnableDefaultNackBackoffPolicy bool   // 是否启用重试补偿时间策略, 只有在不使用重试队列topic时生效
 
-	ConsumeLogLevelIsInfo bool // 将消费日志设为info
 	ConsumeCount          int  // 消费者数量
 	ConsumeThreadCount    int  // 每个消费者协程数, keyShard模式建议增加ConsumeCount而不是通过ConsumeThreadCount提高速度
 	ReceiveMsgRetryTime   int  // 消费者接收消息失败重试时间, 单位毫秒
@@ -126,6 +125,9 @@ func (conf *Config) Check() error {
 	}
 	if conf.DLQMaxDeliveries > 0 && conf.DLQRetryLetterTopic == "" {
 		conf.DLQRetryLetterTopic = conf.SubscriptionName + defDLQRetryLetterTopicSuffix
+	}
+	if conf.EnableRetryTopic && conf.DLQMaxDeliveries < 1 {
+		return fmt.Errorf("只有启用 DLQMaxDeliveries 时 EnableRetryTopic 才有效")
 	}
 	if conf.ReconsumeTime < 1 {
 		conf.ReconsumeTime = defReconsumeTime
