@@ -52,6 +52,9 @@ type Config struct {
 	ConnectionTimeout int    // 连接超时, 单位毫秒
 	OperationTimeout  int    // 操作超时, 单位毫秒
 
+	AuthBasicUser     string // 基础认证用户名, 可用于 AuthenticationProviderBasic 的认证扩展
+	AuthBasicPassword string // 基础认证密码
+
 	Topics                         string // 消费topic, 多个topic用英文逗号连接. 示例: persistent://public/default/test1,persistent://public/default/test2
 	TopicsPattern                  string // 支持正则匹配的消费topic, 要求所有topic都在同一个命名空间. 示例: persistent://public/default/test-.*
 	AutoDiscoveryPeriod            int    // 指定轮询新分区或新主题的时间间隔, 单位毫秒. 只有 TopicsPattern 生效时才会启用

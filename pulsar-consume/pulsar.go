@@ -117,6 +117,13 @@ func NewConsumeService(app core.IApp, conf *Config) (*PulsarConsumeService, erro
 		MaxConnectionsPerBroker: 1,
 		Logger:                  log.DefaultNopLogger(),
 	}
+	if conf.AuthBasicUser != "" {
+		auth, err := pulsar.NewAuthenticationBasic(conf.AuthBasicUser, conf.AuthBasicPassword)
+		if err != nil {
+			return nil, fmt.Errorf("创建pulsar认证失败: %v", err)
+		}
+		co.Authentication = auth
+	}
 
 	client, err := pulsar.NewClient(co)
 	if err != nil {
