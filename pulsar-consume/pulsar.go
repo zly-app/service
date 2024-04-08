@@ -65,7 +65,10 @@ type consumeReq struct {
 }
 
 func (p *PulsarConsumeService) consumeHandler(msg Message) bool {
-	ctx, chain := filter.GetServiceFilter(p.app.BaseContext(), string(DefaultServiceType)+"/"+p.name, "Consume")
+	ctx, span := utils.Otel.GetSpanWithMap(p.app.BaseContext(), msg.Properties())
+	defer span.End()
+
+	ctx, chain := filter.GetServiceFilter(ctx, string(DefaultServiceType)+"/"+p.name, "Consume")
 	r := &consumeReq{
 		MID:             msg.ID().String(),
 		Topic:           msg.Topic(),
@@ -78,7 +81,8 @@ func (p *PulsarConsumeService) consumeHandler(msg Message) bool {
 		msg:             msg,
 	}
 	_, err := chain.Handle(ctx, r, func(ctx context.Context, req interface{}) (interface{}, error) {
-		msg := req.(*consumeReq).msg
+		r := req.(*consumeReq)
+		msg := r.msg
 		err := utils.Recover.WrapCall(func() error {
 			for _, fn := range p.handler {
 				if err := fn(ctx, msg); err != nil {
