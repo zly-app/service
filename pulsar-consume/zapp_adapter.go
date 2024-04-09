@@ -13,25 +13,20 @@ import (
 // 默认服务类型
 const DefaultServiceType core.ServiceType = "pulsar-consume"
 
-// 当前服务类型
-var nowServiceType = DefaultServiceType
-
-// 设置服务类型, 这个函数应该在 zapp.NewApp 之前调用
-func SetServiceType(t core.ServiceType) {
-	nowServiceType = t
+func init() {
+	service.RegisterCreatorFunc(DefaultServiceType, func(app core.IApp) core.IService {
+		return NewServiceAdapter(app)
+	})
 }
 
 // 启用pulsar-consume服务
 func WithService() zapp.Option {
-	service.RegisterCreatorFunc(nowServiceType, func(app core.IApp) core.IService {
-		return NewServiceAdapter(app)
-	})
-	return zapp.WithService(nowServiceType)
+	return zapp.WithService(DefaultServiceType)
 }
 
 // 注册handler
 func RegistryHandler(consumeName string, handlers ...ConsumerHandler) {
-	zapp.App().InjectService(nowServiceType, serviceAdapterInjectData{
+	zapp.App().InjectService(DefaultServiceType, serviceAdapterInjectData{
 		ConsumeName: consumeName,
 		Handlers:    handlers,
 	})
@@ -110,9 +105,9 @@ func (s *ServiceAdapter) Close() error {
 
 func NewServiceAdapter(app core.IApp) core.IService {
 	consumersConf := make(map[string]interface{})
-	err := app.GetConfig().ParseServiceConfig(nowServiceType, &consumersConf)
+	err := app.GetConfig().ParseServiceConfig(DefaultServiceType, &consumersConf)
 	if err != nil {
-		logger.Log.Panic("服务配置错误", zap.String("serviceType", string(nowServiceType)), zap.Error(err))
+		logger.Log.Panic("服务配置错误", zap.String("serviceType", string(DefaultServiceType)), zap.Error(err))
 	}
 
 	services := make(map[string]*PulsarConsumeService, len(consumersConf))
@@ -120,9 +115,9 @@ func NewServiceAdapter(app core.IApp) core.IService {
 		conf := &serviceAdapterConfig{
 			Config: *NewConfig(),
 		}
-		err = app.GetConfig().ParseServiceConfig(nowServiceType+"."+core.ServiceType(name), conf)
+		err = app.GetConfig().ParseServiceConfig(DefaultServiceType+"."+core.ServiceType(name), conf)
 		if err != nil {
-			logger.Log.Panic("服务配置错误", zap.String("serviceType", string(nowServiceType)), zap.String("name", name), zap.Error(err))
+			logger.Log.Panic("服务配置错误", zap.String("serviceType", string(DefaultServiceType)), zap.String("name", name), zap.Error(err))
 		}
 		if conf.Disable {
 			services[name] = nil
@@ -130,7 +125,7 @@ func NewServiceAdapter(app core.IApp) core.IService {
 		}
 		s, err := NewConsumeService(name, app, &conf.Config)
 		if err != nil {
-			logger.Log.Panic("创建服务失败", zap.String("serviceType", string(nowServiceType)), zap.String("name", name), zap.Error(err))
+			logger.Log.Panic("创建服务失败", zap.String("serviceType", string(DefaultServiceType)), zap.String("name", name), zap.Error(err))
 		}
 		services[name] = s
 	}
