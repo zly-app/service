@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type ConsumerHandler func(ctx context.Context, msg Message) error
+type ConsumerHandler func(ctx context.Context, msg *Message) error
 
 type MQTTConsumeService struct {
 	name    string
@@ -116,33 +116,30 @@ func (s *MQTTConsumeService) process(_ mqtt.Client, msg mqtt.Message) {
 	})
 }
 
-type consumeReq struct {
+type Message struct {
 	Duplicate bool `json:"Duplicate,omitempty"`
 	Qos       byte
 	Retained  bool `json:"Retained,omitempty"`
 	MID       uint16
 	Topic     string
 	Payload   string
-	msg       Message
 }
 
-func (s *MQTTConsumeService) consumeHandler(msg Message) {
+func (s *MQTTConsumeService) consumeHandler(msg mqtt.Message) {
 	ctx, chain := filter.GetServiceFilter(context.Background(), string(DefaultServiceType)+"/"+s.name, "Consume")
-	r := &consumeReq{
+	r := &Message{
 		Duplicate: msg.Duplicate(),
 		Qos:       msg.Qos(),
 		Retained:  msg.Retained(),
 		Topic:     msg.Topic(),
 		MID:       msg.MessageID(),
 		Payload:   string(msg.Payload()),
-		msg:       msg,
 	}
 	_, err := chain.Handle(ctx, r, func(ctx context.Context, req interface{}) (interface{}, error) {
-		r := req.(*consumeReq)
-		msg := r.msg
+		r := req.(*Message)
 		err := utils.Recover.WrapCall(func() error {
 			for _, fn := range s.handler {
-				if err := fn(ctx, msg); err != nil {
+				if err := fn(ctx, r); err != nil {
 					return err
 				}
 			}

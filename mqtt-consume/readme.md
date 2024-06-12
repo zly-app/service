@@ -50,8 +50,8 @@ func main() {
 	defer app.Exit()
 
 	mqtt_consume.RegistryHandler("t1", // 注册handler, 这里的注册名要和配置文件中的一样
-		func(ctx context.Context, msg mqtt_consume.Message) error {
-			app.Info(ctx, "Payload: ", string(msg.Payload()))
+		func(ctx context.Context, msg *mqtt_consume.Message) error {
+			app.Info(ctx, "Payload: ", msg.Payload)
 			return nil
 		})
 
