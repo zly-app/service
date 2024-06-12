@@ -128,6 +128,7 @@ func NewServiceAdapter(app core.IApp) core.IService {
 			logger.Log.Panic("创建服务失败", zap.String("serviceType", string(DefaultServiceType)), zap.String("name", name), zap.Error(err))
 		}
 		services[name] = s
+		logger.Log.Info("启动pulsar消费服务ok", zap.String("name", name))
 	}
 
 	return &ServiceAdapter{

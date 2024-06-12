@@ -34,6 +34,10 @@ func NewConsumeService(name string, app core.IApp, conf *Config) (*MQTTConsumeSe
 		opts.SetUsername(conf.User)     //账号
 		opts.SetPassword(conf.Password) //密码
 	}
+	opts.SetAutoAckDisabled(true) // 关闭自动确认
+	opts.SetCleanSession(conf.CleanSession)
+	opts.SetConnectTimeout(time.Duration(conf.WaitConnectedTimeMs) * time.Millisecond)
+
 	client := mqtt.NewClient(opts)
 	token := client.Connect()
 	waitOk := token.WaitTimeout(time.Duration(conf.WaitConnectedTimeMs) * time.Millisecond)
@@ -77,6 +81,7 @@ func (s *MQTTConsumeService) Start() error {
 	}
 
 	s.workers = NewWorkers(s.conf.ConsumeThreadCount)
+	s.workers.Start()
 
 	topics := strings.Split(s.conf.Topics, ",")
 	for i := range topics {
@@ -144,6 +149,5 @@ func (s *MQTTConsumeService) consumeHandler(msg Message) {
 	if err != nil {
 		logger.Log.Error("mqtt msg consume err", zap.String("mqtt_name", s.name), zap.String("topic", msg.Topic()), zap.Error(err))
 	}
-
 	msg.Ack()
 }
