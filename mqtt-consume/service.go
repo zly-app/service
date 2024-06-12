@@ -108,18 +108,13 @@ func (s *MQTTConsumeService) process(_ mqtt.Client, msg mqtt.Message) {
 }
 
 type consumeReq struct {
-	Duplicate       bool `json:"Duplicate,omitempty"`
-	Qos             byte
-	Retained        bool `json:"Retained,omitempty"`
-	MID             uint16
-	Topic           string
-	Payload         string
-	PublishTime     time.Time         `json:"PublishTime,omitempty"`
-	Key             string            `json:"Key,omitempty"`
-	OrderingKey     string            `json:"OrderingKey,omitempty"`
-	Properties      map[string]string `json:"Properties,omitempty"`
-	RedeliveryCount uint32            `json:"RedeliveryCount,omitempty"`
-	msg             Message
+	Duplicate bool `json:"Duplicate,omitempty"`
+	Qos       byte
+	Retained  bool `json:"Retained,omitempty"`
+	MID       uint16
+	Topic     string
+	Payload   string
+	msg       Message
 }
 
 func (s *MQTTConsumeService) consumeHandler(msg Message) {
