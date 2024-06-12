@@ -27,6 +27,10 @@ type MQTTConsumeService struct {
 }
 
 func NewConsumeService(name string, app core.IApp, conf *Config) (*MQTTConsumeService, error) {
+	if err := conf.Check(app); err != nil {
+		return nil, fmt.Errorf("配置检查失败: %v", err)
+	}
+
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(conf.Server)
 	opts.SetClientID(conf.ClientID) //设备唯一id，正常应该是设备拿自己的设备id注册到服务器上。
