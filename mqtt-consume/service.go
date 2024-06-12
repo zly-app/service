@@ -148,6 +148,7 @@ func (s *MQTTConsumeService) consumeHandler(msg Message) {
 	})
 	if err != nil {
 		logger.Log.Error("mqtt msg consume err", zap.String("mqtt_name", s.name), zap.String("topic", msg.Topic()), zap.Error(err))
+		return
 	}
 	msg.Ack()
 }

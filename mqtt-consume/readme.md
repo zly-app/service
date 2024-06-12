@@ -25,7 +25,7 @@ services:
         topics: test # 消费topic, 多个topic用英文逗号连接. 示例: test/topic/a,test/topic/b,test/topic/+
         Qos: 1 # qos级别, 0最多交付一次, 1至少交付一次, 2仅交付一次
         ClientID: '' # clientID 如果为空则设为 实例id. 如果客户端使用一个重复的 Client ID 连接至服务器，将会把已使用该 Client ID 连接成功的客户端踢下线。
-        CleanSession: true # 清除会话, 设为false时, 服务端会为同一个会话的客户端保留一定数量的离线消息, 通常是1000条. 不会保存Qos=0的消息
+        CleanSession: true # 清除会话, 设为false时, 服务端会为同一个会话的客户端保留一定数量的离线消息, 通常是1000条. 不会保存Qos=0的消息. 部分mqtt服务器不支持这个功能
         
         ConsumeThreadCount: 0 # 消费者协程数, 0表示使用逻辑处理器数量*2
 ```
