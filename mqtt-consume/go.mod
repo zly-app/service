@@ -1,4 +1,4 @@
-module github.com/zly-app/service/mqtt
+module github.com/zly-app/service/mqtt-consume
 
 go 1.18
 
