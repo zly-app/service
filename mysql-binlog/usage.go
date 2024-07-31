@@ -25,11 +25,14 @@ func SetServiceType(t core.ServiceType) {
 	nowServiceType = t
 }
 
-// 启用mysql-binlog服务
-func WithService() zapp.Option {
+func init() {
 	service.RegisterCreatorFunc(nowServiceType, func(app core.IApp) core.IService {
 		return NewMysqlBinlogService(app)
 	})
+}
+
+// 启用mysql-binlog服务
+func WithService() zapp.Option {
 	return zapp.WithService(nowServiceType)
 }
 

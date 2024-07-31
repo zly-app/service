@@ -27,11 +27,14 @@ func SetServiceType(t core.ServiceType) {
 	nowServiceType = t
 }
 
-// 启用cron服务
-func WithService() zapp.Option {
+func init() {
 	service.RegisterCreatorFunc(nowServiceType, func(app core.IApp) core.IService {
 		return NewCronService(app)
 	})
+}
+
+// 启用cron服务
+func WithService() zapp.Option {
 	return zapp.WithService(nowServiceType)
 }
 
