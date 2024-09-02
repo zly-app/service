@@ -8,6 +8,7 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/sirupsen/logrus"
 	"github.com/zly-app/zapp/core"
 	"github.com/zly-app/zapp/filter"
 	"github.com/zly-app/zapp/pkg/utils"
@@ -116,7 +117,8 @@ func NewConsumeService(name string, app core.IApp, conf *Config) (*PulsarConsume
 		OperationTimeout:        time.Duration(conf.OperationTimeout) * time.Millisecond,
 		ListenerName:            conf.ListenerName,
 		MaxConnectionsPerBroker: 1,
-		Logger:                  log.DefaultNopLogger(),
+		//Logger:                  log.DefaultNopLogger(),
+		Logger: log.NewLoggerWithLogrus(logrus.StandardLogger()),
 	}
 	if conf.AuthBasicUser != "" {
 		auth, err := pulsar.NewAuthenticationBasic(conf.AuthBasicUser, conf.AuthBasicPassword)
