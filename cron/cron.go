@@ -452,7 +452,7 @@ func (c *CronService) rebuildTask(task ITask) ITask {
 
 	var trigger ITrigger
 	if conf.IsOnceTrigger {
-		t, err := zutils.Time.TextToTimeOfLayout(conf.Expression, zutils.Time.Layout)
+		t, err := zutils.Time(time.Local).TextToTimeOfLayout(conf.Expression, zutils.T.Layout)
 		if err != nil {
 			logger.Log.Fatal("解析一次性任务失败",
 				zap.String("task", task.Name()),
