@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zly-app/zapp/logger"
+	"github.com/zly-app/zapp/log"
 	"go.uber.org/zap"
 )
 
@@ -56,10 +56,12 @@ type PosFileHandler struct {
 	size int64    // 当前写入大小
 }
 
-/*pos文件, 将pos以追加方式写入到文件中
-  filename pos文件路径
-  defaultBinlogName pos文件不存在时使用这个binlog文件
-  defaultPos pos文件不存在时binlog文件使用这个位置
+/*
+pos文件, 将pos以追加方式写入到文件中
+
+	filename pos文件路径
+	defaultBinlogName pos文件不存在时使用这个binlog文件
+	defaultPos pos文件不存在时binlog文件使用这个位置
 */
 func NewPosFileHandler(opts ...PosFileOption) IEventHandler {
 	f := &PosFileHandler{
@@ -188,7 +190,7 @@ func (f *PosFileHandler) getPosOfFile(filename string) (binlogName string, pos u
 
 func (f *PosFileHandler) OnPosSynced(binlogName string, pos uint32, force bool) error {
 	if err := f.preparePosFile(); err != nil {
-		logger.Log.Fatal("准备pos文件失败", zap.Error(err))
+		log.Fatal("准备pos文件失败", zap.Error(err))
 	}
 
 	var buff bytes.Buffer
@@ -202,7 +204,7 @@ func (f *PosFileHandler) OnPosSynced(binlogName string, pos uint32, force bool) 
 	if f.maxFileSize > 0 && f.size > f.maxFileSize { // 超出最大大小则旋转
 		err := f.rotate(line)
 		if err != nil {
-			logger.Log.Fatal("旋转失败", zap.Error(err))
+			log.Fatal("旋转失败", zap.Error(err))
 		}
 		return nil
 	}

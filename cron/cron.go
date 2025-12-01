@@ -18,7 +18,7 @@ import (
 
 	"github.com/zly-app/zapp/component/gpool"
 	"github.com/zly-app/zapp/core"
-	"github.com/zly-app/zapp/logger"
+	"github.com/zly-app/zapp/log"
 	"github.com/zly-app/zapp/pkg/utils"
 	"github.com/zlyuancn/zutils"
 	"go.uber.org/zap"
@@ -406,8 +406,8 @@ func (c *CronService) execute(task ITask) {
 		return
 	}
 
-	baseCtx, span := utils.Otel.StartSpan(context.Background(), task.Name()+" trigger")
-	defer utils.Otel.EndSpan(span)
+	baseCtx, span := utils.Trace.StartSpan(context.Background(), task.Name()+" trigger")
+	defer utils.Trace.EndSpan(span)
 
 	log := c.app.NewTraceLogger(baseCtx, zap.String("task_name", task.Name()))
 
@@ -454,7 +454,7 @@ func (c *CronService) rebuildTask(task ITask) ITask {
 	if conf.IsOnceTrigger {
 		t, err := zutils.Time(time.Local).TextToTimeOfLayout(conf.Expression, zutils.T.Layout)
 		if err != nil {
-			logger.Log.Fatal("解析一次性任务失败",
+			log.Fatal("解析一次性任务失败",
 				zap.String("task", task.Name()),
 				zap.String("expression", conf.Expression),
 				zap.Error(err),

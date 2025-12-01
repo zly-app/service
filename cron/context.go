@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/zly-app/zapp/core"
-	"github.com/zly-app/zapp/logger"
+	"github.com/zly-app/zapp/log"
 	"go.uber.org/zap"
 )
 
@@ -31,7 +31,7 @@ type Context struct {
 }
 
 func newContext(ctx context.Context, task ITask) IContext {
-	log := logger.Log.NewTraceLogger(ctx, zap.String("task_name", task.Name()))
+	log := log.Log.NewTraceLogger(ctx, zap.String("task_name", task.Name()))
 	return &Context{
 		task:    task,
 		handler: task.Handler(),

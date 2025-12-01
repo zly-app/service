@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/zly-app/zapp/core"
-	"github.com/zly-app/zapp/logger"
+	"github.com/zly-app/zapp/log"
 	"go.uber.org/zap"
 )
 
@@ -67,7 +67,7 @@ func NewNsqConsumeService(app core.IApp) core.IService {
 		err = conf.Check()
 	}
 	if err != nil {
-		logger.Log.Panic("服务配置错误", zap.String("serviceType", string(nowServiceType)), zap.Error(err))
+		log.Panic("服务配置错误", zap.String("serviceType", string(nowServiceType)), zap.Error(err))
 	}
 
 	return &NsqConsumeService{

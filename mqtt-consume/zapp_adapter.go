@@ -5,7 +5,7 @@ import (
 
 	"github.com/zly-app/zapp"
 	"github.com/zly-app/zapp/core"
-	"github.com/zly-app/zapp/logger"
+	"github.com/zly-app/zapp/log"
 	"github.com/zly-app/zapp/service"
 	"go.uber.org/zap"
 )
@@ -105,7 +105,7 @@ func NewServiceAdapter(app core.IApp) core.IService {
 	consumersConf := make(map[string]interface{})
 	err := app.GetConfig().ParseServiceConfig(DefaultServiceType, &consumersConf)
 	if err != nil {
-		logger.Log.Panic("服务配置错误", zap.String("serviceType", string(DefaultServiceType)), zap.Error(err))
+		log.Panic("服务配置错误", zap.String("serviceType", string(DefaultServiceType)), zap.Error(err))
 	}
 
 	services := make(map[string]*MQTTConsumeService, len(consumersConf))
@@ -115,7 +115,7 @@ func NewServiceAdapter(app core.IApp) core.IService {
 		}
 		err = app.GetConfig().ParseServiceConfig(DefaultServiceType+"."+core.ServiceType(name), conf)
 		if err != nil {
-			logger.Log.Panic("服务配置错误", zap.String("serviceType", string(DefaultServiceType)), zap.String("name", name), zap.Error(err))
+			log.Panic("服务配置错误", zap.String("serviceType", string(DefaultServiceType)), zap.String("name", name), zap.Error(err))
 		}
 		if conf.Disable {
 			services[name] = nil
@@ -123,10 +123,10 @@ func NewServiceAdapter(app core.IApp) core.IService {
 		}
 		s, err := NewConsumeService(name, app, &conf.Config)
 		if err != nil {
-			logger.Log.Panic("创建服务失败", zap.String("serviceType", string(DefaultServiceType)), zap.String("name", name), zap.Error(err))
+			log.Panic("创建服务失败", zap.String("serviceType", string(DefaultServiceType)), zap.String("name", name), zap.Error(err))
 		}
 		services[name] = s
-		logger.Log.Info("启动mqtt消费服务ok", zap.String("name", name))
+		log.Info("启动mqtt消费服务ok", zap.String("name", name))
 	}
 
 	return &ServiceAdapter{

@@ -10,7 +10,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/zly-app/zapp/core"
 	"github.com/zly-app/zapp/filter"
-	"github.com/zly-app/zapp/logger"
+	"github.com/zly-app/zapp/log"
 	"github.com/zly-app/zapp/pkg/utils"
 	"go.uber.org/zap"
 )
@@ -106,7 +106,7 @@ func (s *MQTTConsumeService) subscribe(topic string) error {
 	if token.Error() != nil {
 		return fmt.Errorf("subscribe mqtt topic: %v err: %v", topic, token.Error())
 	}
-	logger.Log.Info("subscribe mqtt topic", zap.String("mqtt_name", s.name), zap.String("topic", topic))
+	log.Info("subscribe mqtt topic", zap.String("mqtt_name", s.name), zap.String("topic", topic))
 	return nil
 }
 
@@ -148,7 +148,7 @@ func (s *MQTTConsumeService) consumeHandler(msg mqtt.Message) {
 		return nil, err
 	})
 	if err != nil {
-		logger.Log.Error("mqtt msg consume err", zap.String("mqtt_name", s.name), zap.String("topic", msg.Topic()), zap.Error(err))
+		log.Error("mqtt msg consume err", zap.String("mqtt_name", s.name), zap.String("topic", msg.Topic()), zap.Error(err))
 		return
 	}
 	msg.Ack()

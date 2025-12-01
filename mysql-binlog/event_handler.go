@@ -12,7 +12,7 @@ import (
 	"github.com/go-mysql-org/go-mysql/canal"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
-	"github.com/zly-app/zapp/logger"
+	"github.com/zly-app/zapp/log"
 	"go.uber.org/zap"
 )
 
@@ -92,18 +92,18 @@ func (b *BaseEventHandler) GetStartPos() (binlogName string, pos uint32, err err
 	return LatestPos, 0, nil
 }
 func (b *BaseEventHandler) OnEventParseErr(event *canal.RowsEvent, err error) (skip bool) {
-	logger.Log.Warn("OnEventParseErr", zap.Any("event", event), zap.Error(err))
+	log.Warn("OnEventParseErr", zap.Any("event", event), zap.Error(err))
 	return true
 }
 func (b *BaseEventHandler) OnTableChanged(schema, table, sql string) {
-	logger.Log.Debug("OnTableChanged", zap.String("schema", schema), zap.String("table", table), zap.String("sql", sql))
+	log.Debug("OnTableChanged", zap.String("schema", schema), zap.String("table", table), zap.String("sql", sql))
 }
 func (b *BaseEventHandler) OnRow(records []*Record) {
 	for i, r := range records {
-		logger.Log.Debug("OnRow", i, r.String())
+		log.Debug("OnRow", i, r.String())
 	}
 }
 func (b *BaseEventHandler) OnPosSynced(binlogName string, pos uint32, force bool) error {
-	logger.Log.Debug("OnPosSynced", zap.String("binlogName", binlogName), zap.Uint32("pos", pos), zap.Bool("force", force))
+	log.Debug("OnPosSynced", zap.String("binlogName", binlogName), zap.Uint32("pos", pos), zap.Bool("force", force))
 	return nil
 }

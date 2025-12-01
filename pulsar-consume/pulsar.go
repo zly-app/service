@@ -66,7 +66,7 @@ type consumeReq struct {
 }
 
 func (p *PulsarConsumeService) consumeHandler(msg Message) bool {
-	ctx, span := utils.Otel.GetSpanWithMap(p.app.BaseContext(), msg.Properties())
+	ctx, span := utils.Trace.GetSpanWithMap(p.app.BaseContext(), msg.Properties())
 	defer span.End()
 
 	ctx, chain := filter.GetServiceFilter(ctx, string(DefaultServiceType)+"/"+p.name, "Consume")

@@ -126,8 +126,8 @@ func (t *Task) execute(ctx context.Context) error {
 	executor := t.executor
 	t.mx.Unlock()
 
-	doCtx, span := utils.Otel.StartSpan(ctx, string(DefaultServiceType)+"/"+t.Name())
-	defer utils.Otel.EndSpan(span)
+	doCtx, span := utils.Trace.StartSpan(ctx, string(DefaultServiceType)+"/"+t.Name())
+	defer utils.Trace.EndSpan(span)
 
 	onDo := func(retryNums int) (IContext, error) {
 		if t.timeout > 0 {
