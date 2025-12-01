@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/zly-app/zapp/logger"
+	"github.com/zly-app/zapp/log"
 	"go.uber.org/zap"
 
 	"github.com/zly-app/service/api/utils"
@@ -18,12 +18,12 @@ type handlerUtil struct {
 
 func newHandler(handler interface{}) *handlerUtil {
 	if handler == nil {
-		logger.Log.Fatal("handler为nil", zap.String("handler", fmt.Sprintf("%T", handler)))
+		log.Fatal("handler为nil", zap.String("handler", fmt.Sprintf("%T", handler)))
 	}
 
 	hType := reflect.TypeOf(handler)
 	if hType.Kind() != reflect.Func {
-		logger.Log.Fatal("handler必须是函数", zap.String("handler", fmt.Sprintf("%T", handler)))
+		log.Fatal("handler必须是函数", zap.String("handler", fmt.Sprintf("%T", handler)))
 	}
 
 	hName := utils.GetFuncName(handler)
@@ -39,25 +39,25 @@ func newHandler(handler interface{}) *handlerUtil {
 func (h *handlerUtil) checkHandlerFingerprint() {
 	// 检查入参
 	if h.hType.NumIn() < 1 || h.hType.NumIn() > 2 {
-		logger.Log.Fatal("handler的入参数量为1个或2个", zap.String("handlerName", h.name), zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
+		log.Fatal("handler的入参数量为1个或2个", zap.String("handlerName", h.name), zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
 	}
 
 	// 检查第一个参数
 	arg0 := h.hType.In(0)
 	if !arg0.AssignableTo(typeOfContext) {
-		logger.Log.Fatal("handler的第一个入参必须是 *api.Context", zap.String("handlerName", h.name), zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
+		log.Fatal("handler的第一个入参必须是 *api.Context", zap.String("handlerName", h.name), zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
 	}
 
 	// 检查出参
 	if h.hType.NumOut() < 1 || h.hType.NumOut() > 2 {
-		logger.Log.Fatal("handler的出参数量为1个或2个", zap.String("handlerName", h.name), zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
+		log.Fatal("handler的出参数量为1个或2个", zap.String("handlerName", h.name), zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
 	}
 
 	// 如果出参数为2个, 最后一个出参必须是error
 	if h.hType.NumOut() == 2 {
 		out1 := h.hType.Out(1)
 		if !out1.AssignableTo(typeOfError) {
-			logger.Log.Fatal("handler的第二个出参必须是 error", zap.String("handlerName", h.name), zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
+			log.Fatal("handler的第二个出参必须是 error", zap.String("handlerName", h.name), zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
 		}
 	}
 }
@@ -78,7 +78,7 @@ func (h *handlerUtil) mustMakeReqCreator() func(ctx *Context) (reflect.Value, er
 		arg1 = arg1.Elem() // 获取req的真实类型
 	}
 	if arg1.Kind() != reflect.Struct {
-		logger.Log.Fatal("handler的第二个入参必须是 struct 或 *struct", zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
+		log.Fatal("handler的第二个入参必须是 struct 或 *struct", zap.String("fingerprint", fmt.Sprintf("%T", h.handler)))
 	}
 
 	// 返回建造者
