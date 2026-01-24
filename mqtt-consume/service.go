@@ -2,8 +2,11 @@ package mqtt_consume
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -41,6 +44,19 @@ func NewConsumeService(name string, app core.IApp, conf *Config) (*MQTTConsumeSe
 	opts.SetAutoAckDisabled(true) // 关闭自动确认
 	opts.SetCleanSession(conf.CleanSession)
 	opts.SetConnectTimeout(time.Duration(conf.WaitConnectedTimeMs) * time.Millisecond)
+
+	if conf.TLSCAFile != "" {
+		caCert, err := os.ReadFile(conf.TLSCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("读取CA证书失败: %v", err)
+		}
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("解析CA证书失败")
+		}
+		tc := &tls.Config{RootCAs: caCertPool, InsecureSkipVerify: conf.InsecureSkipVerify}
+		opts.SetTLSConfig(tc)
+	}
 
 	client := mqtt.NewClient(opts)
 	token := client.Connect()

@@ -16,11 +16,13 @@ services:
   mqtt-consume:
     t1: # 注册名
       config:
-        Server: localhost:1883 # mqtt服务地址
+        Server: tcp://localhost:1883 # mqtt服务地址. 如 tcp://localhost:1883 ssl://localhost:8883
         WaitConnectedTimeMs: 5000 # 等待连接超时时间, 单位毫秒
         
         User: '' # mqtt用户名
         Password: '' # mqtt密码
+        TLSCAFile: '' # tls根证书公钥文件路径
+        InsecureSkipVerify: false # 跳过证书验证
         
         topics: test # 消费topic, 多个topic用英文逗号连接. 示例: test/topic/a,test/topic/b,test/topic/+
         Qos: 1 # qos级别, 0最多交付一次, 1至少交付一次, 2仅交付一次
