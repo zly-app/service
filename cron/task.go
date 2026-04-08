@@ -10,10 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// ITask 定时任务接口
 type ITask interface {
 	// 返回任务名
 	Name() string
-	// 获取handler
+	// 获取 handler
 	Handler() Handler
 	// 返回启用状态
 	IsEnable() bool
@@ -26,62 +27,69 @@ type ITask interface {
 	MakeNextTriggerTime(t time.Time) (time.Time, bool)
 	// 立即触发执行, 阻塞等待执行结束
 	Trigger(ctx context.Context) error
-
-	// 重置定时, 发生在被定时器添加任务时和重新设为启用时
-	resetClock()
-	// 设置启用
-	setEnable(enable bool)
-	// 设置堆索引
-	setHeapIndex(index int)
-	// 获取堆索引
-	getHeapIndex() int
 }
 
-type Task struct {
-	name string
+// heapTask 是任务堆的内部包装, 仅在 task_heap.go 中使用
+// 它嵌入 ITask 并维护堆索引, 不实现 ITask 接口
+type heapTask struct {
+	task   ITask
+	heapId int // -1 表示不在堆中
+}
 
+func (h *heapTask) TriggerTime() time.Time {
+	return h.task.TriggerTime()
+}
+
+func (h *heapTask) IsEnable() bool {
+	return h.task.IsEnable()
+}
+
+func (h *heapTask) Name() string {
+	return h.task.Name()
+}
+
+// Task 是 ITask 的标准实现
+type Task struct {
+	name    string
 	handler Handler
 
-	triggerTime time.Time
-	trigger     ITrigger
-	executor    IExecutor
-	timeout     time.Duration // 执行超时时间
+	trigger   ITrigger
+	executor  IExecutor
+	timeout   time.Duration // 执行超时
 
-	enable int32
-	mx     sync.Mutex // 用于锁 triggerTime, trigger, executor
+	triggerTime time.Time      // 下次触发时间
+	mu          sync.Mutex     // 保护 triggerTime
 
-	heapIndex int // 堆索引
+	enable atomic.Int32 // 1=启用, 0=禁用
 }
 
 type TaskConfig struct {
 	Trigger  ITrigger
 	Executor IExecutor
 	Handler  Handler
-	TimeOut  time.Duration
+	Timeout  time.Duration // 执行超时
 	Enable   bool
 }
 
-// 创建一个任务
+// NewTask 创建一个基于 cron 表达式的任务
 func NewTask(name string, expression string, enable bool, handler Handler) ITask {
-	trigger := NewCronTrigger(expression)
-	executor := NewExecutor(0, 0, 1)
 	return NewTaskOfConfig(name, TaskConfig{
-		Trigger:  trigger,
-		Executor: executor,
+		Trigger:  NewCronTrigger(expression),
+		Executor: NewExecutor(0, 0, 1),
 		Handler:  handler,
-		TimeOut:  0,
+		Timeout:  0,
 		Enable:   enable,
 	})
 }
 
-// 根据任务配置创建一个任务
+// NewTaskOfConfig 根据配置创建一个任务
 func NewTaskOfConfig(name string, config TaskConfig) ITask {
 	t := &Task{
 		name:     name,
 		trigger:  config.Trigger,
 		executor: config.Executor,
 		handler:  config.Handler,
-		timeout:  config.TimeOut,
+		timeout:  config.Timeout,
 	}
 	t.setEnable(config.Enable)
 	return t
@@ -90,77 +98,75 @@ func NewTaskOfConfig(name string, config TaskConfig) ITask {
 func (t *Task) Name() string {
 	return t.name
 }
+
 func (t *Task) Handler() Handler {
 	return t.handler
 }
+
 func (t *Task) IsEnable() bool {
-	return atomic.LoadInt32(&t.enable) == 1
+	return t.enable.Load() == 1
 }
+
 func (t *Task) Timeout() time.Duration {
 	return t.timeout
 }
+
 func (t *Task) TriggerTime() time.Time {
-	t.mx.Lock()
+	t.mu.Lock()
 	tt := t.triggerTime
-	t.mx.Unlock()
+	t.mu.Unlock()
 	return tt
 }
+
 func (t *Task) MakeNextTriggerTime(tt time.Time) (time.Time, bool) {
 	if !t.IsEnable() {
 		return tt, false
 	}
 
-	tt, ok := t.trigger.MakeNextTriggerTime(tt)
-	t.mx.Lock()
-	t.triggerTime = tt
-	t.mx.Unlock()
-	return tt, ok
+	next, ok := t.trigger.MakeNextTriggerTime(tt)
+	if ok {
+		t.mu.Lock()
+		t.triggerTime = next
+		t.mu.Unlock()
+	}
+	return next, ok
 }
+
 func (t *Task) Trigger(ctx context.Context) error {
 	return t.execute(ctx)
 }
 
-// 执行
 func (t *Task) execute(ctx context.Context) error {
-	t.mx.Lock()
-	executor := t.executor
-	t.mx.Unlock()
-
 	doCtx, span := utils.Trace.StartSpan(ctx, string(DefaultServiceType)+"/"+t.Name())
 	defer utils.Trace.EndSpan(span)
 
-	onDo := func(retryNums int) (IContext, error) {
-		if t.timeout > 0 {
-			timeoutCtx, cancel := context.WithTimeout(doCtx, t.timeout)
-			defer cancel()
-			doCtx = timeoutCtx
-		}
+	if t.timeout > 0 {
+		var cancel context.CancelFunc
+		doCtx, cancel = context.WithTimeout(doCtx, t.timeout)
+		defer cancel()
+	}
 
+	onDo := func(retryNums int) (IContext, error) {
 		iCtx := newContext(doCtx, t)
 		return iCtx, t.handler(iCtx)
 	}
-	return executor.Do(onDo, t.errCallback)
-}
-func (t *Task) errCallback(ctx IContext, err error) {
-	ctx.Warn(ctx, "cron.error! try retry", zap.String("err", utils.Recover.GetRecoverErrorDetail(err)))
+	return t.executor.Do(onDo, t.errCallback)
 }
 
-func (t *Task) resetClock() {
-	t.mx.Lock()
-	trigger := t.trigger
-	t.mx.Unlock()
-	trigger.ResetClock()
+func (t *Task) errCallback(ctx IContext, err error) {
+	ctx.Warn("cron error, will retry", zap.Error(err))
 }
+
+// resetClock 重置触发器的时钟(内部方法)
+func (t *Task) resetClock() {
+	t.trigger.ResetClock()
+}
+
+// setEnable 设置启用状态(内部方法)
 func (t *Task) setEnable(enable bool) {
 	if enable {
-		atomic.StoreInt32(&t.enable, 1)
+		t.enable.Store(1)
 	} else {
-		atomic.StoreInt32(&t.enable, 0)
+		t.enable.Store(0)
 	}
-}
-func (t *Task) setHeapIndex(index int) {
-	t.heapIndex = index
-}
-func (t *Task) getHeapIndex() int {
-	return t.heapIndex
 }

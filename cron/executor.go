@@ -55,13 +55,15 @@ func (w *Executor) Do(onDo func(retryNums int) (IContext, error), errCallback Er
 		return OutOfMaxConcurrentExecuteCount
 	}
 
+	if w.maxConcurrentExecuteCount <= 0 {
+		atomic.AddInt64(&w.concurrentExecuteCount, 1)
+	}
+
 	w.wg.Add(1)
 
 	err := w.doRetry(w.retryInterval, w.maxRetryCount, onDo, errCallback)
 
-	if w.maxConcurrentExecuteCount > 0 {
-		atomic.AddInt64(&w.concurrentExecuteCount, -1) // 执行完毕也要退回去
-	}
+	atomic.AddInt64(&w.concurrentExecuteCount, -1) // 执行完毕退回去
 	w.wg.Done()
 	return err
 }

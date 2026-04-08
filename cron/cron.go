@@ -227,7 +227,9 @@ func (c *CronService) AddTask(task ITask) bool {
 	c.tasks[task.Name()] = task
 
 	if task.IsEnable() && c.RunState() == StartedState {
-		task.resetClock()
+		if tk, ok := task.(*Task); ok {
+			tk.resetClock()
+		}
 		_, ok := task.MakeNextTriggerTime(time.Now())
 		if ok {
 			c.pushTaskToHeap(task)
@@ -265,9 +267,17 @@ func (c *CronService) EnableTask(task ITask, enable bool) {
 	heap := c.getHeapOfTime(task.TriggerTime().Unix())
 	heap.Remove(task)
 
-	task.setEnable(enable)
+	// Task 是包内私有类型，所有通过 AddTask 注入的任务都是 *Task 类型
+	// EnableTask 的参数虽然是 ITask 接口，但实际上总是接收 Task
+	// 这里使用类型断言处理
+	if tk, ok := task.(*Task); ok {
+		tk.setEnable(enable)
+		if enable && c.RunState() == StartedState {
+			tk.resetClock()
+		}
+	}
+
 	if enable && c.RunState() == StartedState {
-		task.resetClock()
 		_, ok := task.MakeNextTriggerTime(time.Now())
 		if ok {
 			c.pushTaskToHeap(task)
@@ -434,7 +444,9 @@ func (c *CronService) resetClock() {
 			continue
 		}
 
-		task.resetClock()
+		if tk, ok := task.(*Task); ok {
+			tk.resetClock()
+		}
 		_, ok := task.MakeNextTriggerTime(now)
 		if ok {
 			c.pushTaskToHeap(task)
@@ -470,7 +482,7 @@ func (c *CronService) rebuildTask(task ITask) ITask {
 		Trigger:  trigger,
 		Executor: executor,
 		Handler:  task.Handler(),
-		TimeOut:  time.Duration(conf.TimeoutMs) * time.Second,
+		Timeout:  time.Duration(conf.TimeoutMs) * time.Second,
 		Enable:   !conf.Disable,
 	})
 }
