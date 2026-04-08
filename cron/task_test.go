@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/zly-app/service/cron/internal"
 )
 
 // --- Task 基本属性 ---
@@ -69,13 +71,13 @@ func TestTaskEnableToggle(t *testing.T) {
 		t.Fatal("expected enabled initially")
 	}
 
-	tk := task.(*Task)
-	tk.setEnable(false)
+	tk := task.(*internal.Task)
+	tk.SetEnable(false)
 	if task.IsEnable() {
 		t.Fatal("expected disabled after setEnable(false)")
 	}
 
-	tk.setEnable(true)
+	tk.SetEnable(true)
 	if !task.IsEnable() {
 		t.Fatal("expected enabled after setEnable(true)")
 	}
@@ -85,10 +87,9 @@ func TestTaskEnableToggle(t *testing.T) {
 
 func TestTaskTriggerTimeInitially(t *testing.T) {
 	task := NewTask("time-task", "@every 1s", true, func(ctx IContext) error { return nil })
-	// triggerTime 未初始化时为空时间
-	tk := task.(*Task)
-	if !tk.TriggerTime().IsZero() {
-		t.Fatalf("expected zero time initially, got %v", tk.TriggerTime())
+	// triggerTime 未初始化时为空时间, TriggerTime 是 ITask 的公开方法, 直接调用即可
+	if !task.TriggerTime().IsZero() {
+		t.Fatalf("expected zero time initially, got %v", task.TriggerTime())
 	}
 }
 
@@ -422,11 +423,11 @@ func TestExecutorIsRunning(t *testing.T) {
 
 func TestTaskResetClock(t *testing.T) {
 	task := NewTask("reset-clock-task", "@every 1s", true, func(ctx IContext) error { return nil })
-	tk := task.(*Task)
+	tk := task.(*internal.Task)
 
 	// 获取初始触发时间
 	now := time.Now()
-	tk.resetClock()
+	tk.ResetClock()
 
 	next, ok := task.MakeNextTriggerTime(now)
 	if !ok {

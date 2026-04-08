@@ -14,7 +14,28 @@
 
 package cron
 
-import "sort"
+import (
+	"sort"
+	"time"
+)
+
+// heapTask 是任务堆的内部包装, 仅在 task_heap.go 中使用
+type heapTask struct {
+	task   ITask
+	heapId int // -1 表示不在堆中
+}
+
+func (h *heapTask) TriggerTime() time.Time {
+	return h.task.TriggerTime()
+}
+
+func (h *heapTask) IsEnable() bool {
+	return h.task.IsEnable()
+}
+
+func (h *heapTask) Name() string {
+	return h.task.Name()
+}
 
 // ITaskHeap 定义了任务堆的接口
 // 用于管理按触发时间排序的任务集合，支持快速访问最早需要执行的任务

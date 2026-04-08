@@ -3,11 +3,62 @@ package cron
 import (
 	"testing"
 	"time"
+
+	"github.com/zly-app/service/cron/internal"
+	"github.com/zly-app/service/cron/types"
 )
 
 // makeTestTask 创建指定触发时间的测试任务
 func makeTestTask(name string, minute int) ITask {
-	return &Task{name: name, triggerTime: time.Date(2020, 1, 1, 0, minute, 0, 0, time.Local)}
+	// 创建一个轻量的测试任务，使用 testTrigger
+	task := internal.NewTaskOfConfig(name, types.TaskConfig{
+		Trigger:  &testTrigger{time: time.Date(2020, 1, 1, 0, minute, 0, 0, time.Local)},
+		Executor: &testExecutor{},
+		Handler:  func(ctx types.IContext) error { return nil },
+		Enable:   true,
+	})
+
+	// 调用 MakeNextTriggerTime 来初始化 triggerTime
+	task.MakeNextTriggerTime(time.Now())
+	return task
+}
+
+// testTrigger 测试用的触发器
+type testTrigger struct {
+	time time.Time
+}
+
+func (t *testTrigger) TriggerType() types.TriggerType {
+	return types.CronTriggerType
+}
+
+func (t *testTrigger) Expression() string {
+	return "test"
+}
+
+func (t *testTrigger) ResetClock() {}
+
+func (t *testTrigger) MakeNextTriggerTime(tt time.Time) (time.Time, bool) {
+	return t.time, true
+}
+
+// GetTime 获取触发时间（用于测试）
+func (t *testTrigger) GetTime() time.Time {
+	return t.time
+}
+
+// testExecutor 测试用的执行器
+type testExecutor struct{}
+
+func (e *testExecutor) Do(onDo func(retryNums int) (types.IContext, error), errCallback types.ErrCallback) error {
+	_, err := onDo(0)
+	return err
+}
+
+func (e *testExecutor) Wait() {}
+
+func (e *testExecutor) IsRunning() bool {
+	return false
 }
 
 // makeTestTaskData 创建一组测试数据
@@ -318,17 +369,17 @@ func TestTaskHeap_HeapIdConsistency(t *testing.T) {
 	heap := NewTaskHeap(tasks...)
 
 	// 验证所有任务的 heapId 都是有效的
-	for i, task := range heap.(*taskHeap).tasks {
-		if task.heapId != i {
-			t.Fatalf("索引 %d 的任务 heapId 应为 %d，实际 %d", i, i, task.heapId)
+	for i, ht := range heap.(*taskHeap).tasks {
+		if ht.heapId != i {
+			t.Fatalf("索引 %d 的任务 heapId 应为 %d，实际 %d", i, i, ht.heapId)
 		}
 	}
 
 	// Pop 后验证 heapId 更新
 	heap.Pop()
-	for i, task := range heap.(*taskHeap).tasks {
-		if task.heapId != i {
-			t.Fatalf("Pop 后索引 %d 的任务 heapId 应为 %d，实际 %d", i, i, task.heapId)
+	for i, ht := range heap.(*taskHeap).tasks {
+		if ht.heapId != i {
+			t.Fatalf("Pop 后索引 %d 的任务 heapId 应为 %d，实际 %d", i, i, ht.heapId)
 		}
 	}
 }
@@ -350,7 +401,7 @@ func TestTaskHeap_DuplicateTimes(t *testing.T) {
 		t.Fatalf("期望首先弹出 d，实际 %s", first.Name())
 	}
 
-	// 其余的順序不重要，只要都能弹出即可
+	// 其余的顺序不重要，只要都能弹出即可
 	if heap.Len() != 3 {
 		t.Fatalf("期望剩余 3 个元素，实际 %d", heap.Len())
 	}

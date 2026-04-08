@@ -22,6 +22,8 @@ import (
 	"github.com/zly-app/zapp/pkg/utils"
 	"github.com/zlyuancn/zutils"
 	"go.uber.org/zap"
+
+	"github.com/zly-app/service/cron/internal"
 )
 
 type ICron interface {
@@ -227,8 +229,8 @@ func (c *CronService) AddTask(task ITask) bool {
 	c.tasks[task.Name()] = task
 
 	if task.IsEnable() && c.RunState() == StartedState {
-		if tk, ok := task.(*Task); ok {
-			tk.resetClock()
+		if tk, ok := task.(*internal.Task); ok {
+			tk.ResetClock()
 		}
 		_, ok := task.MakeNextTriggerTime(time.Now())
 		if ok {
@@ -267,13 +269,11 @@ func (c *CronService) EnableTask(task ITask, enable bool) {
 	heap := c.getHeapOfTime(task.TriggerTime().Unix())
 	heap.Remove(task)
 
-	// Task 是包内私有类型，所有通过 AddTask 注入的任务都是 *Task 类型
-	// EnableTask 的参数虽然是 ITask 接口，但实际上总是接收 Task
-	// 这里使用类型断言处理
-	if tk, ok := task.(*Task); ok {
-		tk.setEnable(enable)
+	// 使用内部包的 Task 类型访问内部方法
+	if tk, ok := task.(*internal.Task); ok {
+		tk.SetEnable(enable)
 		if enable && c.RunState() == StartedState {
-			tk.resetClock()
+			tk.ResetClock()
 		}
 	}
 
@@ -444,8 +444,8 @@ func (c *CronService) resetClock() {
 			continue
 		}
 
-		if tk, ok := task.(*Task); ok {
-			tk.resetClock()
+		if tk, ok := task.(*internal.Task); ok {
+			tk.ResetClock()
 		}
 		_, ok := task.MakeNextTriggerTime(now)
 		if ok {
@@ -472,13 +472,13 @@ func (c *CronService) rebuildTask(task ITask) ITask {
 				zap.Error(err),
 			)
 		}
-		trigger = NewOnceTrigger(t)
+		trigger = internal.NewOnceTrigger(t)
 	} else {
-		trigger = NewCronTrigger(conf.Expression)
+		trigger = internal.NewCronTrigger(conf.Expression)
 	}
 
-	executor := NewExecutor(conf.RetryCount, time.Duration(conf.RetrySleepMs)*time.Second, conf.MaxConcurrentExecuteCount)
-	return NewTaskOfConfig(task.Name(), TaskConfig{
+	executor := internal.NewExecutor(conf.RetryCount, time.Duration(conf.RetrySleepMs)*time.Second, conf.MaxConcurrentExecuteCount)
+	return internal.NewTaskOfConfig(task.Name(), TaskConfig{
 		Trigger:  trigger,
 		Executor: executor,
 		Handler:  task.Handler(),

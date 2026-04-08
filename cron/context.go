@@ -1,53 +1,11 @@
 package cron
 
 import (
-	"context"
-
-	"github.com/zly-app/zapp/core"
-	"github.com/zly-app/zapp/log"
-	"go.uber.org/zap"
+	"github.com/zly-app/service/cron/types"
 )
 
-type Handler func(ctx IContext) (err error)
+// Handler 任务处理函数
+type Handler = types.Handler
 
-type IContext interface {
-	// 获取task
-	Task() ITask
-	// 获取元数据
-	Meta() interface{}
-	// 设置元数据
-	SetMeta(meta interface{})
-
-	core.ILogger
-	context.Context
-}
-
-type Context struct {
-	task    ITask
-	handler Handler
-	meta    interface{}
-	core.ILogger
-	context.Context
-}
-
-func newContext(ctx context.Context, task ITask) IContext {
-	log := log.Log.NewTraceLogger(ctx, zap.String("task_name", task.Name()))
-	return &Context{
-		task:    task,
-		handler: task.Handler(),
-		meta:    nil,
-		ILogger: log,
-		Context: ctx,
-	}
-}
-
-func (ctx *Context) Task() ITask {
-	return ctx.task
-}
-
-func (ctx *Context) Meta() interface{} {
-	return ctx.meta
-}
-func (ctx *Context) SetMeta(meta interface{}) {
-	ctx.meta = meta
-}
+// IContext 任务执行上下文接口
+type IContext = types.IContext
