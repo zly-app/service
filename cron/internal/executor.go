@@ -31,7 +31,7 @@ func NewExecutor(retryCount int64, retryInterval time.Duration, maxConcurrentExe
 	}
 }
 
-func (w *Executor) Do(onDo func(retryNums int) (types.IContext, error), errCallback types.ErrCallback) error {
+func (w *Executor) Do(onDo func(remainAttempts int) (types.IContext, error), errCallback types.ErrCallback) error {
 	if w.maxConcurrentExecuteCount > 0 && atomic.AddInt64(&w.concurrentExecuteCount, 1) > w.maxConcurrentExecuteCount {
 		atomic.AddInt64(&w.concurrentExecuteCount, -1)
 		return types.OutOfMaxConcurrentExecuteCount
@@ -58,19 +58,19 @@ func (w *Executor) IsRunning() bool {
 	return atomic.LoadInt64(&w.concurrentExecuteCount) > 0
 }
 
-func (w *Executor) doRetry(interval time.Duration, retryCount int64,
+func (w *Executor) doRetry(interval time.Duration, remainAttempts int64,
 	onDo func(retryNums int) (types.IContext, error), errCallback types.ErrCallback) (err error) {
 	var ctx types.IContext
 	for {
 		err = utils.Recover.WrapCall(func() error {
-			ctx, err = onDo(int(retryCount))
+			ctx, err = onDo(int(remainAttempts))
 			return err
 		})
-		if err == nil || retryCount == 0 {
+		if err == nil || remainAttempts == 0 {
 			return
 		}
 
-		retryCount--
+		remainAttempts--
 
 		if errCallback != nil {
 			errCallback(ctx, err)

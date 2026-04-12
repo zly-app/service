@@ -5,11 +5,12 @@
 // - 使用数组存储完全二叉树，索引 i 的父节点为 (i-1)/2，左子节点为 2*i+1，右子节点为 2*i+2
 // - 维护最小堆性质：父节点的触发时间总是小于等于子节点
 // - 每个 heapTask 维护 heapId 索引，支持 O(log n) 的 Remove 操作
+// - 通过 taskIndex map 实现 O(1) 的任务查找
 //
 // 时间复杂度:
 // - Push: O(log n)
 // - Pop: O(log n)
-// - Remove: O(n) 查找 + O(log n) 调整 = O(n)
+// - Remove: O(1) 查找 + O(log n) 调整 = O(log n)
 // - Sort: O(n log n)
 
 package cron
@@ -58,13 +59,18 @@ type ITaskHeap interface {
 
 // taskHeap 是任务堆的实现
 type taskHeap struct {
-	tasks []*heapTask
+	tasks     []*heapTask
+	taskIndex map[ITask]*heapTask // task -> heapTask 映射, 用于 O(1) 查找
 }
 
 func NewTaskHeap(tasks ...ITask) ITaskHeap {
-	h := &taskHeap{}
+	h := &taskHeap{
+		taskIndex: make(map[ITask]*heapTask, len(tasks)),
+	}
 	for _, task := range tasks {
-		h.tasks = append(h.tasks, &heapTask{task: task, heapId: -1})
+		ht := &heapTask{task: task, heapId: -1}
+		h.tasks = append(h.tasks, ht)
+		h.taskIndex[task] = ht
 	}
 	h.Sort()
 	return h
@@ -86,7 +92,8 @@ func (h *taskHeap) Pop() ITask {
 	}
 
 	// 保存要弹出的任务
-	task := h.tasks[0]
+	ht := h.tasks[0]
+	task := ht.task
 
 	// 替换第一个元素为最后一个
 	last := h.tasks[len(h.tasks)-1]
@@ -99,29 +106,34 @@ func (h *taskHeap) Pop() ITask {
 		h.down(0)
 	}
 
-	task.heapId = -1 // 标记为不在堆中
-	return task.task
+	ht.heapId = -1 // 标记为不在堆中
+	delete(h.taskIndex, task)
+	return task
 }
 
 func (h *taskHeap) Push(task ITask) {
 	ht := &heapTask{task: task, heapId: -1}
+	h.taskIndex[task] = ht
 	h.tasks = append(h.tasks, ht)
 	h.up(len(h.tasks) - 1)
 }
 
 func (h *taskHeap) Remove(task ITask) {
-	// 找到任务在堆中的索引
-	index := -1
-	for i, t := range h.tasks {
-		if t.task == task {
-			index = i
-			break
-		}
-	}
-
-	if index == -1 || index >= len(h.tasks) {
+	// 通过 map O(1) 查找任务
+	ht, ok := h.taskIndex[task]
+	if !ok {
 		return
 	}
+
+	index := ht.heapId
+	if index < 0 || index >= len(h.tasks) || h.tasks[index] != ht {
+		// heapId 不一致，从 map 中清理后返回
+		delete(h.taskIndex, task)
+		return
+	}
+
+	ht.heapId = -1
+	delete(h.taskIndex, task)
 
 	// 如果要移除的是最后一个元素，直接删除
 	if index == len(h.tasks)-1 {

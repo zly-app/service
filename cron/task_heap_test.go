@@ -369,7 +369,8 @@ func TestTaskHeap_HeapIdConsistency(t *testing.T) {
 	heap := NewTaskHeap(tasks...)
 
 	// 验证所有任务的 heapId 都是有效的
-	for i, ht := range heap.(*taskHeap).tasks {
+	th := heap.(*taskHeap)
+	for i, ht := range th.tasks {
 		if ht.heapId != i {
 			t.Fatalf("索引 %d 的任务 heapId 应为 %d，实际 %d", i, i, ht.heapId)
 		}
@@ -377,7 +378,7 @@ func TestTaskHeap_HeapIdConsistency(t *testing.T) {
 
 	// Pop 后验证 heapId 更新
 	heap.Pop()
-	for i, ht := range heap.(*taskHeap).tasks {
+	for i, ht := range th.tasks {
 		if ht.heapId != i {
 			t.Fatalf("Pop 后索引 %d 的任务 heapId 应为 %d，实际 %d", i, i, ht.heapId)
 		}
@@ -404,5 +405,137 @@ func TestTaskHeap_DuplicateTimes(t *testing.T) {
 	// 其余的顺序不重要，只要都能弹出即可
 	if heap.Len() != 3 {
 		t.Fatalf("期望剩余 3 个元素，实际 %d", heap.Len())
+	}
+}
+
+// --- 修复 Bug 后的新测试 ---
+
+func TestTaskHeap_RemoveSetsHeapIdToMinusOne(t *testing.T) {
+	// Bug 修复验证: Remove 后被移除任务的 heapId 应为 -1
+	tasks := makeTestTaskData()
+	heap := NewTaskHeap(tasks...)
+	th := heap.(*taskHeap)
+
+	// 移除中间元素
+	removedTask := tasks[4] // "6"
+	heap.Remove(removedTask)
+
+	// 验证被移除的任务不在 taskIndex 中
+	_, ok := th.taskIndex[removedTask]
+	if ok {
+		t.Fatalf("被移除的任务不应存在于 taskIndex 中")
+	}
+
+	// 验证剩余任务的 heapId 仍然正确
+	for i, h := range th.tasks {
+		if h.heapId != i {
+			t.Fatalf("索引 %d 的任务 heapId 应为 %d，实际 %d", i, i, h.heapId)
+		}
+	}
+}
+
+func TestTaskHeap_RemoveLastElementSetsHeapIdToMinusOne(t *testing.T) {
+	// Bug 修复验证: 移除最后一个元素时 heapId 也应设为 -1
+	singleTask := makeTestTask("single", 1)
+	heap := NewTaskHeap(singleTask)
+	th := heap.(*taskHeap)
+
+	// 在 Remove 之前获取 heapTask 引用
+	var removedHt *heapTask
+	for _, ht := range th.tasks {
+		removedHt = ht
+	}
+
+	heap.Remove(singleTask)
+
+	if removedHt.heapId != -1 {
+		t.Fatalf("被移除的最后一个元素 heapId 应为 -1，实际 %d", removedHt.heapId)
+	}
+	if _, ok := th.taskIndex[singleTask]; ok {
+		t.Fatal("被移除的任务不应存在于 taskIndex 中")
+	}
+}
+
+func TestTaskHeap_RemoveFromAllHeaps(t *testing.T) {
+	// 验证 Remove 在多个堆中调用时的行为: 只会从包含该任务的堆中移除
+	tasks := makeTestTaskData()
+	heap1 := NewTaskHeap(tasks...)
+	heap2 := NewTaskHeap()
+
+	// heap2 中没有任务, Remove 不应报错
+	heap2.Remove(tasks[0])
+	if heap2.Len() != 0 {
+		t.Fatalf("空堆 Remove 不应改变长度")
+	}
+
+	// heap1 中有任务, Remove 应正常工作
+	heap1.Remove(tasks[0])
+	if heap1.Len() != 6 {
+		t.Fatalf("期望长度 6，实际 %d", heap1.Len())
+	}
+
+	// 再次 Remove 同一个任务 (已不在堆中), 不应报错
+	heap1.Remove(tasks[0])
+	if heap1.Len() != 6 {
+		t.Fatalf("重复 Remove 不应改变长度，期望 6，实际 %d", heap1.Len())
+	}
+}
+
+func TestTaskHeap_PopSetsHeapIdToMinusOne(t *testing.T) {
+	// Bug 修复验证: Pop 后被弹出任务的 heapId 应为 -1
+	tasks := makeTestTaskData()
+	heap := NewTaskHeap(tasks...)
+	th := heap.(*taskHeap)
+
+	// 找到堆顶任务对应的 heapTask
+	topHt := th.tasks[0]
+	topTask := topHt.task
+
+	heap.Pop()
+
+	if topHt.heapId != -1 {
+		t.Fatalf("被弹出的任务 heapId 应为 -1，实际 %d", topHt.heapId)
+	}
+	if _, ok := th.taskIndex[topTask]; ok {
+		t.Fatal("被弹出的任务不应存在于 taskIndex 中")
+	}
+}
+
+func TestTaskHeap_TaskIndexConsistency(t *testing.T) {
+	// 验证 taskIndex 与 tasks 切片始终一致
+	tasks := makeTestTaskData()
+	heap := NewTaskHeap(tasks...)
+	th := heap.(*taskHeap)
+
+	// 验证初始状态
+	if len(th.taskIndex) != len(th.tasks) {
+		t.Fatalf("taskIndex 长度 %d 与 tasks 长度 %d 不一致", len(th.taskIndex), len(th.tasks))
+	}
+	for _, ht := range th.tasks {
+		if th.taskIndex[ht.task] != ht {
+			t.Fatalf("taskIndex 与 tasks 不一致")
+		}
+	}
+
+	// Push 后验证
+	newTask := makeTestTask("8", 8)
+	heap.Push(newTask)
+	if len(th.taskIndex) != len(th.tasks) {
+		t.Fatalf("Push 后 taskIndex 长度 %d 与 tasks 长度 %d 不一致", len(th.taskIndex), len(th.tasks))
+	}
+	if th.taskIndex[newTask] == nil {
+		t.Fatal("新 Push 的任务应在 taskIndex 中")
+	}
+
+	// Pop 后验证
+	heap.Pop()
+	if len(th.taskIndex) != len(th.tasks) {
+		t.Fatalf("Pop 后 taskIndex 长度 %d 与 tasks 长度 %d 不一致", len(th.taskIndex), len(th.tasks))
+	}
+
+	// Remove 后验证
+	heap.Remove(tasks[2])
+	if len(th.taskIndex) != len(th.tasks) {
+		t.Fatalf("Remove 后 taskIndex 长度 %d 与 tasks 长度 %d 不一致", len(th.taskIndex), len(th.tasks))
 	}
 }

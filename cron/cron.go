@@ -101,13 +101,14 @@ type CronService struct {
 	tasks           map[string]ITask // 任务
 	taskFileConfigs map[string]*TaskFileConfig
 	heaps           []ITaskHeap // 任务堆列表, 根据触发时间取模将任务分配到不同的任务堆
+	heapMxs         []sync.Mutex // 每个 heap 一个锁, 减少 heartBeat 与任务管理的锁竞争
 
 	runState  RunState
 	closeChan chan struct{}
 
 	gpool core.IGPool // 协程池
 
-	mx sync.Mutex // 锁 tasks, heaps
+	mx sync.Mutex // 锁 tasks
 }
 
 func NewCronService(app core.IApp) core.IService {
@@ -126,6 +127,7 @@ func NewCronService(app core.IApp) core.IService {
 		tasks:     make(map[string]ITask),
 		runState:  StoppedState,
 		closeChan: make(chan struct{}),
+		heapMxs:   make([]sync.Mutex, heapsCount),
 	}
 	c.remakeHeaps()
 	if conf.ThreadCount > 0 {
@@ -234,7 +236,7 @@ func (c *CronService) AddTask(task ITask) bool {
 		}
 		_, ok := task.MakeNextTriggerTime(time.Now())
 		if ok {
-			c.pushTaskToHeap(task)
+			c.pushTaskToHeapLocked(task)
 		}
 	}
 
@@ -251,10 +253,7 @@ func (c *CronService) RemoveTask(name string) {
 	}
 
 	delete(c.tasks, name)
-
-	heap := c.getHeapOfTime(task.TriggerTime().Unix())
-	heap.Remove(task)
-
+	c.removeTaskFromAllHeaps(task)
 	c.mx.Unlock()
 }
 
@@ -266,8 +265,7 @@ func (c *CronService) EnableTask(task ITask, enable bool) {
 		return
 	}
 
-	heap := c.getHeapOfTime(task.TriggerTime().Unix())
-	heap.Remove(task)
+	c.removeTaskFromAllHeaps(task)
 
 	// 使用内部包的 Task 类型访问内部方法
 	if tk, ok := task.(*internal.Task); ok {
@@ -348,49 +346,99 @@ func (c *CronService) isStarted() bool {
 // 构建时间堆
 func (c *CronService) remakeHeaps() {
 	heaps := make([]ITaskHeap, heapsCount)
+	heapMxs := make([]sync.Mutex, heapsCount)
+	for i := 0; i < heapsCount; i++ {
+		heaps[i] = NewTaskHeap()
+	}
+	c.heaps = heaps
+	c.heapMxs = heapMxs
+}
+
+// 构建时间堆 (仅重建堆数据, 不重建 heapMxs, 用于 resetClock 中已持有所有 heapMxs 锁的场景)
+func (c *CronService) remakeHeapsLocked() {
+	heaps := make([]ITaskHeap, heapsCount)
 	for i := 0; i < heapsCount; i++ {
 		heaps[i] = NewTaskHeap()
 	}
 	c.heaps = heaps
 }
 
-// 根据时间获取任务堆
-func (c *CronService) getHeapOfTime(sec int64) ITaskHeap {
-	bucket := sec & (heapsCount - 1)
-	return c.heaps[bucket]
+// 根据时间获取任务堆索引
+func (c *CronService) getHeapIndexOfTime(sec int64) int {
+	return int(sec & (heapsCount - 1))
 }
 
-// 将任务放入任务堆中
+// 根据时间获取任务堆
+func (c *CronService) getHeapOfTime(sec int64) ITaskHeap {
+	return c.heaps[c.getHeapIndexOfTime(sec)]
+}
+
+// 将任务放入任务堆中 (需要持有 heapMxs 对应锁)
 func (c *CronService) pushTaskToHeap(task ITask) {
+	idx := c.getHeapIndexOfTime(task.TriggerTime().Unix())
+	c.heapMxs[idx].Lock()
+	c.heaps[idx].Push(task)
+	c.heapMxs[idx].Unlock()
+}
+
+// 将任务放入任务堆中 (不单独加 heap 锁, 用于调用方已持有所有必要锁的场景如 resetClock)
+func (c *CronService) pushTaskToHeapLocked(task ITask) {
 	heap := c.getHeapOfTime(task.TriggerTime().Unix())
 	heap.Push(task)
 }
 
+// 从所有堆中移除任务 (需要持有 mx 锁, 防止与 heartBeat 的 Pop+push 产生竞态)
+func (c *CronService) removeTaskFromAllHeaps(task ITask) {
+	for i, heap := range c.heaps {
+		c.heapMxs[i].Lock()
+		heap.Remove(task)
+		c.heapMxs[i].Unlock()
+	}
+}
+
 // 心跳
 func (c *CronService) heartBeat(t time.Time) {
-	heap := c.getHeapOfTime(t.Unix())
-
-	c.mx.Lock()
-	defer c.mx.Unlock()
+	idx := c.getHeapIndexOfTime(t.Unix())
+	heap := c.heaps[idx]
+	c.heapMxs[idx].Lock()
+	defer c.heapMxs[idx].Unlock()
 
 	for {
-		if len(heap.Tasks()) == 0 { // 没有任务
+		if heap.Empty() { // 没有任务
 			return
 		}
 
-		task := heap.Tasks()[0]
-		if task.TriggerTime().After(t) { // 时间未到
+		topTask := heap.Tasks()[0]
+		if topTask.TriggerTime().After(t) { // 时间未到
 			return
 		}
 
-		task = heap.Pop()
-		c.triggerTask(task) // 触发
+		task := heap.Pop()
+
+		// 检查任务是否仍在 tasks 中（可能已被 RemoveTask 删除）
+		c.mx.Lock()
+		if _, ok := c.tasks[task.Name()]; !ok {
+			c.mx.Unlock()
+			continue
+		}
 
 		// 获取下一次触发时间
 		_, ok := task.MakeNextTriggerTime(t)
 		if ok {
-			c.pushTaskToHeap(task)
+			// 任务可能需要放入不同的 heap bucket, 获取目标 heap 的锁
+			nextIdx := c.getHeapIndexOfTime(task.TriggerTime().Unix())
+			if nextIdx == idx {
+				heap.Push(task)
+			} else {
+				// 需要放入不同的 heap, 先锁目标 heap
+				c.heapMxs[nextIdx].Lock()
+				c.heaps[nextIdx].Push(task)
+				c.heapMxs[nextIdx].Unlock()
+			}
 		}
+		c.mx.Unlock()
+
+		c.triggerTask(task) // 触发
 	}
 }
 
@@ -436,7 +484,14 @@ func (c *CronService) execute(task ITask) {
 // 这里不要做任何耗时操作, 否则可能会错过下一秒的时间导致任务会延迟64秒后执行
 func (c *CronService) resetClock() {
 	c.mx.Lock()
-	c.remakeHeaps()
+	defer c.mx.Unlock()
+
+	// 锁住所有 heap, 防止 heartBeat 在重建过程中访问
+	for i := range c.heapMxs {
+		c.heapMxs[i].Lock()
+	}
+
+	c.remakeHeapsLocked()
 
 	now := time.Now()
 	for _, task := range c.tasks {
@@ -449,10 +504,13 @@ func (c *CronService) resetClock() {
 		}
 		_, ok := task.MakeNextTriggerTime(now)
 		if ok {
-			c.pushTaskToHeap(task)
+			c.pushTaskToHeapLocked(task)
 		}
 	}
-	c.mx.Unlock()
+
+	for i := range c.heapMxs {
+		c.heapMxs[i].Unlock()
+	}
 }
 
 // 根据配置文件重建task
