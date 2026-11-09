@@ -46,7 +46,7 @@ func NewConsumeService(name string, app core.IApp, conf *Config) (*MQTTConsumeSe
 	opts.SetConnectTimeout(time.Duration(conf.WaitConnectedTimeMs) * time.Millisecond)
 
 	if conf.TLSCAFile != "" {
-		caCert, err := os.ReadFile(conf.TLSCAFile)
+		caCert, err := os.ReadFile(expandHomePath(conf.TLSCAFile))
 		if err != nil {
 			return nil, fmt.Errorf("读取CA证书失败: %v", err)
 		}
