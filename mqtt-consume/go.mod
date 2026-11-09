@@ -4,14 +4,14 @@ go 1.24.1
 
 require (
 	github.com/eclipse/paho.mqtt.golang v1.5.1
-	github.com/zly-app/zapp v1.4.3
+	github.com/zly-app/zapp v1.4.6
 	go.uber.org/zap v1.16.0
 )
 
 require (
 	github.com/bytedance/gopkg v0.1.3 // indirect
-	github.com/bytedance/sonic v1.14.2 // indirect
-	github.com/bytedance/sonic/loader v0.4.0 // indirect
+	github.com/bytedance/sonic v1.15.5 // indirect
+	github.com/bytedance/sonic/loader v0.5.3 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/fsnotify/fsnotify v1.4.7 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect

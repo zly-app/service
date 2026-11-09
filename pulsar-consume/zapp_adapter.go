@@ -10,23 +10,30 @@ import (
 	"go.uber.org/zap"
 )
 
-// 默认服务类型
+// DefaultServiceType 默认服务类型
 const DefaultServiceType core.ServiceType = "pulsar-consume"
 
-func init() {
+// WithService 启用 pulsar-consume 服务，必须在 zapp 初始化前调用。
+func WithService() zapp.Option {
 	service.RegisterCreatorFunc(DefaultServiceType, func(app core.IApp) core.IService {
 		return NewServiceAdapter(app)
 	})
-}
-
-// 启用pulsar-consume服务
-func WithService() zapp.Option {
 	return zapp.WithService(DefaultServiceType)
 }
 
-// 注册handler
-func RegistryHandler(consumeName string, handlers ...ConsumerHandler) {
-	zapp.App().InjectService(DefaultServiceType, serviceAdapterInjectData{
+// Install 返回消费者注册器，必须在 zapp 初始化后调用（例如 app.Run 之前）。
+func Install(app core.IApp) *Registrar {
+	return &Registrar{app: app}
+}
+
+// Registrar 是 pulsar 消费者注册器。
+type Registrar struct {
+	app core.IApp
+}
+
+// RegistryHandler 注册handler
+func (r *Registrar) RegistryHandler(consumeName string, handlers ...ConsumerHandler) {
+	r.app.InjectService(DefaultServiceType, serviceAdapterInjectData{
 		ConsumeName: consumeName,
 		Handlers:    handlers,
 	})

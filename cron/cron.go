@@ -114,10 +114,10 @@ type CronService struct {
 func NewCronService(app core.IApp) core.IService {
 	conf := newConfig()
 	vi := app.GetConfig().GetViper()
-	confKey := "services." + string(nowServiceType)
+	confKey := "services." + string(DefaultServiceType)
 	if vi.IsSet(confKey) {
 		if err := vi.UnmarshalKey(confKey, conf); err != nil {
-			app.Fatal(fmt.Errorf("无法解析<%s>服务配置: %s", nowServiceType, err))
+			app.Fatal(fmt.Errorf("无法解析<%s>服务配置: %s", DefaultServiceType, err))
 		}
 	}
 	conf.check()

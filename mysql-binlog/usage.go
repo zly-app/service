@@ -14,29 +14,28 @@ import (
 	"github.com/zly-app/zapp/service"
 )
 
-// 默认服务类型
+// DefaultServiceType 默认服务类型
 const DefaultServiceType core.ServiceType = "mysql-binlog"
 
-// 当前服务类型
-var nowServiceType = DefaultServiceType
-
-// 设置服务类型, 这个函数应该在 zapp.NewApp 之前调用
-func SetServiceType(t core.ServiceType) {
-	nowServiceType = t
-}
-
-func init() {
-	service.RegisterCreatorFunc(nowServiceType, func(app core.IApp) core.IService {
+// WithService 启用 mysql-binlog 服务，必须在 zapp 初始化前调用。
+func WithService() zapp.Option {
+	service.RegisterCreatorFunc(DefaultServiceType, func(app core.IApp) core.IService {
 		return NewMysqlBinlogService(app)
 	})
+	return zapp.WithService(DefaultServiceType)
 }
 
-// 启用mysql-binlog服务
-func WithService() zapp.Option {
-	return zapp.WithService(nowServiceType)
+// Install 返回事件注册器，必须在 zapp 初始化后调用（例如 app.Run 之前）。
+func Install(app core.IApp) *Registrar {
+	return &Registrar{app: app}
 }
 
-// 注册handler
-func RegistryHandler(handler IEventHandler) {
-	zapp.App().InjectService(nowServiceType, handler)
+// Registrar 是 binlog 事件注册器。
+type Registrar struct {
+	app core.IApp
+}
+
+// RegistryHandler 注册handler
+func (r *Registrar) RegistryHandler(handler IEventHandler) {
+	r.app.InjectService(DefaultServiceType, handler)
 }

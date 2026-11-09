@@ -17,32 +17,34 @@ import (
 	"github.com/zly-app/service/api/config"
 )
 
-// 默认服务类型
+// DefaultServiceType 默认服务类型
 const DefaultServiceType core.ServiceType = "api"
 
-// 当前服务类型
-var nowServiceType = DefaultServiceType
-
-// 设置服务类型, 这个函数应该在 zapp.NewApp 之前调用
-func SetServiceType(t core.ServiceType) {
-	nowServiceType = t
-}
-
-// 启用app服务
+// WithService 启用 api 服务，必须在 zapp 初始化前调用。
 func WithService(opts ...Option) zapp.Option {
-	service.RegisterCreatorFunc(nowServiceType, func(app core.IApp) core.IService {
+	service.RegisterCreatorFunc(DefaultServiceType, func(app core.IApp) core.IService {
 		return newService(app, opts...)
 	})
-	return zapp.WithService(nowServiceType)
+	return zapp.WithService(DefaultServiceType)
 }
 
-// 注册路由
-func RegistryRouter(fn ...RegisterApiRouterFunc) {
+// Install 返回服务注册器，必须在 zapp 初始化后调用（例如 app.Run 之前）。
+func Install(app core.IApp) *Registrar {
+	return &Registrar{app: app}
+}
+
+// Registrar 是 api 服务注册器：拥有「向 api 服务注入路由」这条规则。
+type Registrar struct {
+	app core.IApp
+}
+
+// RegistryRouter 注册路由
+func (r *Registrar) RegistryRouter(fn ...RegisterApiRouterFunc) {
 	a := make([]interface{}, len(fn))
 	for i, h := range fn {
 		a[i] = h
 	}
-	zapp.App().InjectService(nowServiceType, a...)
+	r.app.InjectService(DefaultServiceType, a...)
 }
 
 type Service struct {
@@ -67,7 +69,7 @@ func (s *Service) Close() error { return s.api.Close() }
 
 func newService(app core.IApp, opts ...Option) *Service {
 	conf := config.NewConfig()
-	err := app.GetConfig().ParseServiceConfig(nowServiceType, conf, true)
+	err := app.GetConfig().ParseServiceConfig(DefaultServiceType, conf, true)
 	if err != nil {
 		app.Fatal("获取api服务配置失败", zap.Error(err))
 	}

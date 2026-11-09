@@ -59,7 +59,7 @@ func (m *MysqlBinlogService) Start() error {
 	}
 
 	conf := newConfig()
-	err := m.app.GetConfig().ParseServiceConfig(nowServiceType, conf)
+	err := m.app.GetConfig().ParseServiceConfig(DefaultServiceType, conf)
 	if err == nil {
 		err = conf.Check()
 	}

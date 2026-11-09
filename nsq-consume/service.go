@@ -62,12 +62,12 @@ func (n *NsqConsumeService) Close() error {
 func NewNsqConsumeService(app core.IApp) core.IService {
 	// 加载配置
 	conf := newConfig()
-	err := app.GetConfig().ParseServiceConfig(nowServiceType, conf)
+	err := app.GetConfig().ParseServiceConfig(DefaultServiceType, conf)
 	if err == nil {
 		err = conf.Check()
 	}
 	if err != nil {
-		log.Panic("服务配置错误", zap.String("serviceType", string(nowServiceType)), zap.Error(err))
+		log.Panic("服务配置错误", zap.String("serviceType", string(DefaultServiceType)), zap.Error(err))
 	}
 
 	return &NsqConsumeService{

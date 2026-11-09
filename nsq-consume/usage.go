@@ -14,31 +14,30 @@ import (
 	"github.com/zly-app/zapp/service"
 )
 
-// 默认服务类型
+// DefaultServiceType 默认服务类型
 const DefaultServiceType core.ServiceType = "nsq-consume"
 
-// 当前服务类型
-var nowServiceType = DefaultServiceType
-
-// 设置服务类型, 这个函数应该在 zapp.NewApp 之前调用
-func SetServiceType(t core.ServiceType) {
-	nowServiceType = t
-}
-
-func init() {
-	service.RegisterCreatorFunc(nowServiceType, func(app core.IApp) core.IService {
+// WithService 启用 nsq-consume 服务，必须在 zapp 初始化前调用。
+func WithService() zapp.Option {
+	service.RegisterCreatorFunc(DefaultServiceType, func(app core.IApp) core.IService {
 		return NewNsqConsumeService(app)
 	})
+	return zapp.WithService(DefaultServiceType)
 }
 
-// 启用nsq-consume服务
-func WithService() zapp.Option {
-	return zapp.WithService(nowServiceType)
+// Install 返回消费者注册器，必须在 zapp 初始化后调用（例如 app.Run 之前）。
+func Install(app core.IApp) *Registrar {
+	return &Registrar{app: app}
 }
 
-// 注册handler
-func RegistryHandler(topic, channel string, handler RegistryNsqConsumerHandlerFunc, opts ...ConsumerOption) {
-	zapp.App().InjectService(nowServiceType, &ConsumerConfig{
+// Registrar 是 nsq 消费者注册器。
+type Registrar struct {
+	app core.IApp
+}
+
+// RegistryHandler 注册handler
+func (r *Registrar) RegistryHandler(topic, channel string, handler RegistryNsqConsumerHandlerFunc, opts ...ConsumerOption) {
+	r.app.InjectService(DefaultServiceType, &ConsumerConfig{
 		Topic:   topic,
 		Channel: channel,
 		Handler: handler,
