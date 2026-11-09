@@ -29,9 +29,20 @@ type Party = iris.Party
 type RegisterApiRouterFunc = func(c core.IComponent, router Party)
 
 type ApiService struct {
-	app  core.IApp
-	conf *config.Config
+	app               core.IApp
+	conf              *config.Config
+	writeResponseFunc WriteResponseFunc
 	*iris.Application
+}
+
+// SetWriteResponseFunc 设置写入响应函数（仅作用于本实例）
+func (a *ApiService) SetWriteResponseFunc(fn WriteResponseFunc) {
+	a.writeResponseFunc = fn
+}
+
+// GetWriteResponseFunc 返回当前写入响应函数
+func (a *ApiService) GetWriteResponseFunc() WriteResponseFunc {
+	return a.writeResponseFunc
 }
 
 // 协程池限制
@@ -87,9 +98,10 @@ func NewApiService(app core.IApp, conf *config.Config, opts ...Option) *ApiServi
 	})
 
 	return &ApiService{
-		app:         app,
-		conf:        conf,
-		Application: irisApp,
+		app:               app,
+		conf:              conf,
+		writeResponseFunc: defaultWriteResponse,
+		Application:       irisApp,
 	}
 }
 

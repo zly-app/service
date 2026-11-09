@@ -32,16 +32,10 @@ type Handler = func(ctx *Context) interface{}
 // 写入响应函数
 type WriteResponseFunc func(ctx *Context, code int, message string, data interface{})
 
-// 设置写入响应函数
-func SetWriteResponseFunc(fn WriteResponseFunc) {
-	if fn == nil {
-		panic("WriteResponseFunc is nil")
-	}
-	defaultWriteResponseFunc = fn
-}
-
-// 默认写入响应函数
-var defaultWriteResponseFunc WriteResponseFunc = func(ctx *Context, code int, message string, data interface{}) {
+// defaultWriteResponse 是默认写入响应函数。
+// 它不可被覆写：自定义写入由 api.Install(app).SetWriteResponseFunc 注入到服务实例，
+// 不再有包级可写全局。
+func defaultWriteResponse(ctx *Context, code int, message string, data interface{}) {
 	switch v := data.(type) {
 	case []byte: // 直接写入
 		_, _ = ctx.Write(v)
@@ -64,7 +58,7 @@ var typeOfContext = reflect.TypeOf((*Context)(nil))
 var typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 
 // 包装处理程序
-func wrap(handler interface{}, isMiddleware bool) iris.Handler {
+func wrap(handler interface{}, isMiddleware bool, writeFn WriteResponseFunc) iris.Handler {
 	if handler == nil {
 		log.Fatal("handler为nil", zap.String("handler", fmt.Sprintf("%T", handler)))
 	}
@@ -82,7 +76,7 @@ func wrap(handler interface{}, isMiddleware bool) iris.Handler {
 			return
 		}
 
-		WriteToCtx(ctx, result) // 写入结果
+		writeToCtx(ctx, result, writeFn) // 写入结果
 		ctx.StopExecution()     // 停止调用链
 	}
 }
@@ -90,8 +84,13 @@ func wrap(handler interface{}, isMiddleware bool) iris.Handler {
 // 写入数据到ctx
 //
 // 如果返回bytes会直接返回给客户端
-// 返回其它值会经过处理后再返回给客户端
+// 返回其它值会经过默认处理后返回给客户端
 func WriteToCtx(ctx *Context, result interface{}) {
+	writeToCtx(ctx, result, defaultWriteResponse)
+}
+
+// 写入数据到ctx，使用指定的写入响应函数
+func writeToCtx(ctx *Context, result interface{}, fn WriteResponseFunc) {
 	if err, ok := result.(error); ok {
 		code, message := decodeErr(err)
 
@@ -100,7 +99,7 @@ func WriteToCtx(ctx *Context, result interface{}) {
 			message = err.Error()
 		}
 		ctx.Values().Set("error", err)
-		defaultWriteResponseFunc(ctx, code, message, nil)
+		fn(ctx, code, message, nil)
 		return
 	}
 
@@ -108,13 +107,13 @@ func WriteToCtx(ctx *Context, result interface{}) {
 	switch v := result.(type) {
 	case []byte:
 		ctx.ContentType(iris_context.ContentBinaryHeaderValue)
-		defaultWriteResponseFunc(ctx, OK.Code, OK.Message, v)
+		fn(ctx, OK.Code, OK.Message, v)
 	case *[]byte:
 		ctx.ContentType(iris_context.ContentBinaryHeaderValue)
-		defaultWriteResponseFunc(ctx, OK.Code, OK.Message, *v)
+		fn(ctx, OK.Code, OK.Message, *v)
 	default:
 		ctx.ContentType(iris_context.ContentJSONHeaderValue)
-		defaultWriteResponseFunc(ctx, OK.Code, OK.Message, result)
+		fn(ctx, OK.Code, OK.Message, result)
 	}
 }
 
@@ -132,10 +131,26 @@ func WriteToCtx(ctx *Context, result interface{}) {
 //	    func (ctx *api.Context, req *AnyReqStruct) (interface{}, error)
 //	    func (ctx *api.Context, req *AnyReqStruct) (*AnyOutStruct, error)
 func Wrap(handler interface{}) iris.Handler {
-	return wrap(handler, false)
+	return wrap(handler, false, defaultWriteResponse)
+}
+
+// WrapWith 包装处理程序，使用指定的写入响应函数（供服务实例使用）
+func WrapWith(handler interface{}, fn WriteResponseFunc) iris.Handler {
+	if fn == nil {
+		fn = defaultWriteResponse
+	}
+	return wrap(handler, false, fn)
 }
 
 // 包装中间件, 类似 Wrap, 只有返回nil才能继续调用链, 非nil值表示拦截, 并将结果处理后返回给客户端
 func WrapMiddleware(handler interface{}) iris.Handler {
-	return wrap(handler, true)
+	return wrap(handler, true, defaultWriteResponse)
+}
+
+// WrapMiddlewareWith 包装中间件，使用指定的写入响应函数（供服务实例使用）
+func WrapMiddlewareWith(handler interface{}, fn WriteResponseFunc) iris.Handler {
+	if fn == nil {
+		fn = defaultWriteResponse
+	}
+	return wrap(handler, true, fn)
 }

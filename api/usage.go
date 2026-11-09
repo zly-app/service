@@ -9,6 +9,7 @@
 package api
 
 import (
+	"github.com/kataras/iris/v12"
 	"github.com/zly-app/zapp"
 	"github.com/zly-app/zapp/core"
 	"github.com/zly-app/zapp/service"
@@ -30,12 +31,19 @@ func WithService(opts ...Option) zapp.Option {
 
 // Install 返回服务注册器，必须在 zapp 初始化后调用（例如 app.Run 之前）。
 func Install(app core.IApp) *Registrar {
-	return &Registrar{app: app}
+	r := &Registrar{app: app}
+	if svc, ok := app.GetService(DefaultServiceType); ok {
+		if s, ok := svc.(*Service); ok {
+			r.svc = s
+		}
+	}
+	return r
 }
 
 // Registrar 是 api 服务注册器：拥有「向 api 服务注入路由」这条规则。
 type Registrar struct {
 	app core.IApp
+	svc *Service
 }
 
 // RegistryRouter 注册路由
@@ -45,6 +53,36 @@ func (r *Registrar) RegistryRouter(fn ...RegisterApiRouterFunc) {
 		a[i] = h
 	}
 	r.app.InjectService(DefaultServiceType, a...)
+}
+
+// SetWriteResponseFunc 设置写入响应函数。它只作用于当前 api 服务实例，
+// 不再是包级可写全局。
+func (r *Registrar) SetWriteResponseFunc(fn WriteResponseFunc) *Registrar {
+	if fn == nil {
+		panic("WriteResponseFunc is nil")
+	}
+	if r.svc == nil {
+		r.app.Fatal("api 服务未启用，请在 WithService 之后调用 SetWriteResponseFunc")
+	}
+	r.svc.api.SetWriteResponseFunc(fn)
+	return r
+}
+
+// Wrap 包装处理程序，使用当前服务实例的写入响应函数
+func (r *Registrar) Wrap(handler interface{}) iris.Handler {
+	return WrapWith(handler, r.writeResponseFunc())
+}
+
+// WrapMiddleware 包装中间件，使用当前服务实例的写入响应函数
+func (r *Registrar) WrapMiddleware(handler interface{}) iris.Handler {
+	return WrapMiddlewareWith(handler, r.writeResponseFunc())
+}
+
+func (r *Registrar) writeResponseFunc() WriteResponseFunc {
+	if r.svc == nil {
+		return nil
+	}
+	return r.svc.api.GetWriteResponseFunc()
 }
 
 type Service struct {
